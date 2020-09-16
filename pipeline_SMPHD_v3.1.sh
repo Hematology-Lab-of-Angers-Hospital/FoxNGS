@@ -13,7 +13,7 @@ echo "#-----------------------------------------------------------#"
 echo "#-                                                         -#"
 echo "#-                 Pipeline bioinformatique SMPHD          -#"
 echo "#-                   Données SURESELECQTX                  -#"
-echo "#-                       Version 3.0                       -#"
+echo "#-                       Version 3.1                       -#"
 echo "#-                                                         -#"
 echo "#-----------------------------------------------------------#"
 echo "#############################################################"
@@ -178,8 +178,8 @@ function DATABASE () {
 	# Bed pour couverture et l'analyse qualité R
 	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel.bed
 	# Variant
-	# Fichier Bed Pindel
-	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15.bed
+	# Fichier Bed Pindel Ajout de NPM1
+	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15_NPM1.bed
 	DBSNP=/media/t-chu-027/DATAPART2/Database/DB/dbsnp_138.hg19.vcf
 
 	# Annotation
