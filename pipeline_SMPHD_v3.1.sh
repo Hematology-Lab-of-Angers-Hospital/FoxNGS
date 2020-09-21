@@ -154,7 +154,7 @@ function DATABASE () {
 	PICARD=~/BioNGSTools/picard/picard.jar
 	
 	# Analyse qualité - Script R
-	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/R_Quality_SMPHD_v3.0.Rmd
+	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/R_Quality_SMPHD_v3.1.Rmd
 	# Caller
 
 	VARSCAN=~/BioNGSTools/varscan/VarScan.v2.4.3.jar
@@ -167,9 +167,9 @@ function DATABASE () {
 	# Préparation de l'Annotation
 	VCFTOCSV=~/BioNGSTools/VCF-Simplify/VCF-Simplify.py
 	# Annotation
-	TRAIT_ANNOT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/Treatment_of_Annotation_v3.0.py
+	TRAIT_ANNOT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/Treatment_of_Annotation_v3.1.py
 	EXIST_FILE=~/Bureau/Recherche/Script/exist_file.sh
-	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/database_dictionnary_v3.0.py
+	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/database_dictionnary_v3.1.py
 	# ********************************************
 	# Database 
 	# Fichier
@@ -192,8 +192,8 @@ function DATABASE () {
 	# Changement de nom 
 	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_27_07_20-v3.0.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_statistic_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_statistic_dictionnary.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_Database_variant.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"

@@ -1,0 +1,150 @@
+---
+title: "Rapport de Qualité NGS"
+output: html_document
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+theme: cerulean
+params:
+    directory:
+        value: x
+    file:
+        value: x
+    user:
+        value: x
+    output:
+        value: x
+    pipeline:
+        value: x
+    output_gene:
+        value: x
+
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+
+```{r Chargement du fichier}
+name = paste(params$directory, params$file, sep = '/')
+bed = read.table(name) 
+patient = unlist(strsplit(params$file,"_"))[1]
+```
+## Le fichier analysé est `r name` pour le patient `r patient`. L'utilisateur `r params$user` a lancé le pipeline de routine `r params$pipeline`.
+
+
+# Couverture du design
+
+Graphique de densité de couverture (barre rouge : 50X, barre bleue : profondeur mediane)
+```{r density plot}
+
+library(ggplot2)
+library(xtable)
+library(tidyr)
+
+# Partie 1: Couverture du design
+# Graphique Couverture du design
+p<-ggplot(data.frame(bed))+aes(x=bed$V6)+geom_density(fill="lightblue",color="darkblue", alpha=0.4)+
+  xlim(0, 10000)+xlab("Profondeur")+theme_classic()+
+  geom_vline(aes(xintercept = median(bed$V6)), color="blue",linetype="dashed")+
+  geom_vline(aes(xintercept = 50), color="red")
+p
+
+# Calcul statistique
+mean<-round(mean(bed$V6),0)
+median<-median(bed$V6)
+X50<-nrow(bed[bed$V6>50, ])
+X100<-nrow(bed[bed$V6>100, ])
+X200<-nrow(bed[bed$V6>200, ])
+
+# Recuperation du nombre de ligne
+Nbase<-nrow(bed)
+# Calcul du pourcentage > seuil
+X50b=round((X50/Nbase)*100,2)
+X100b=round((X100/Nbase)*100,2)
+X200b=round((X200/Nbase)*100,2)
+# Ecriture statique commune
+#write(paste("Patient","Couv >200x","Mediane",sep=";"), params$output,append=TRUE)
+write(paste(patient,X200b,median,sep=";"), params$output,append=TRUE)
+
+
+# Categorisation par profondeur de couverture
+bed$V7 <- rep(NA,nrow(bed))
+
+for(i in 1:nrow(bed)){
+
+	if(bed$V6[i]>500){bed$V7[i] <- ">500"}else{
+    if(bed$V6[i]>200){bed$V7[i] <- "]200,500]"}else{
+      if(bed$V6[i]>100){bed$V7[i] <- "]100,200]"}else{
+        if(bed$V6[i]>50){bed$V7[i] <- "]50,100]"}else{
+          bed$V7[i] <- "<=50"
+        }
+      }
+    }
+  }
+}
+
+# Partie 2 : 
+# Visualisation des exons avec couverture
+bed$V8<-NULL
+bed <- cbind(bed,separate(bed, V4, sep = "_", into = c("V8"))$V8)
+colnames(bed) <- c("V1","V2","V3","V4","V5","V6","V7","V8")
+# suppresion reste column Ex _NM_ex3
+bed <-bed[,-9]
+# Preparation du graphique
+gen <- prop.table(table(bed$V8,bed$V7),margin =1)
+gen <- gen[,c(4,3,1,2,5)]
+gen1 <- data.frame(gen)
+# couv50: subset < 50 
+couv50 <- subset(bed,bed$V6<50)
+# count: recuperation Gene-exon et statistique ceux <50
+count <- table(couv50$V4)/table(bed$V4) 
+# Generation du graphique
+# si count > 0: une couverture < 50x existe dans cet ID 
+res <- data.frame(round(count[which(count>0)]*100,2))
+
+# Partie 3 :
+# Statistique sur les genes
+couv = tapply(bed$V6, bed$V8, median)
+couverture = data.frame(t(couv))
+arrondi_couverture = round(couverture,0)
+# Statistques sur les couvertures > 200X 
+gen_200 <- prop.table(table(bed$V8,bed$V6 >200),margin =1)
+gene <- data.frame(t(gen_200[,"TRUE"]))
+matrice_gene = rbind(arrondi_couverture,gene)
+row.names(matrice_gene) =c(paste(patient,"med",sep="_"),paste(patient,">200",sep="_"))
+# Ecriture 
+write.table(matrice_gene,params$output_gene,sep=",",append=TRUE,col.names=FALSE)
+
+```
+
+* Profondeur Mediane = `r median`
+
+* Profondeur Moyenne = `r mean`
+
+* % base > 200X = `r X200b` %
+
+* % base > 100X = `r X100b` %
+
+* % base > 50X = `r X50b` %
+
+
+
+#  Gènes avec couverture < 500X
+```{r Gene_categorie_couverture, message=FALSE}
+# Recuperation colonne v7: categorie de couverture
+ 
+test1 <- gen1$Var1[which((gen1$Var2==">500")&(gen1$Freq!=1))]
+bed1bis <- subset(bed,bed$V8 %in% test1)
+bed1bis$V7 <- factor(paste(bed1bis$V7))
+bed1bis$V7 = factor(bed1bis$V7,levels(bed1bis$V7)[c(4,3,1,2,5)])
+
+ggplot(bed1bis,aes(x=factor(V8),fill=V7,label=V7, stat = "identity"))+ geom_bar(position="fill",width=.5) +
+  scale_fill_manual(values = c("red3","darkorange","goldenrod1","olivedrab1","limegreen"))+coord_flip()+
+  theme_classic()+xlab("")+ylab("")+labs(fill="Profondeur (X)")
+
+```
+
+
+
+
