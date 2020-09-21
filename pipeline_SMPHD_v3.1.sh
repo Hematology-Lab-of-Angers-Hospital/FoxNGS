@@ -424,7 +424,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "samtools sort -@ 14 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
 	#samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
 	echo -e "samtools index -@ 14 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 14 -b tmp/${name}.sort.bam
+	#samtools index -@ 14 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
 	# Total of read
@@ -434,7 +434,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e " Keep only mapped\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -F 0x4 -@ 16 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam" >> $PREPARATION_BAM_FILE
-	samtools view -F 0x4 -h -@ 16 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
+	#samtools view -F 0x4 -h -@ 16 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
 	#echo -e "samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam" >> $PREPARATION_BAM_FILE
 	#samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -443,8 +443,8 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Only of map : $mapped" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	# Unmapped and chimeric
-	unmapped=$(samtools view -f 0x4 -h -@ 12 -c -b tmp/${name}.sort.bam)
-	chimeric=$(samtools view  -f 0x800 -h -@ 12 -c -b tmp/${name}.sort.bam)
+	unmapped=$(samtools view -f 0x4 -h -@ 16 -c -b tmp/${name}.sort.bam)
+	chimeric=$(samtools view  -f 0x800 -h -@ 16 -c -b tmp/${name}.sort.bam)
 	echo -e "Only unmapped : $unmapped" >> $PREPARATION_BAM_FILE
 	echo -e "Only chimeric : $chimeric" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -452,40 +452,43 @@ function LANCEMENT_QUALITY_BAM () {
 	# Intersection avec le fichier du design 
 	# avec les région intronique aussi  pour déceler les mutations de type épissage en plus
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
-	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
+	#$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
 	# Mapped and intersected in region
 	totalmapintersect=$(samtools view -h -@ 16 -c tmp/${name}-on-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
-	ratio=$($totalmapintersect/$mapped*100 | bc -l)
+	echo "($totalmapintersect/$mapped))"
+	ratio=$(echo "$totalmapintersect/$mapped*100" | bc -l)
 	echo -e "Ratio of read mapped in panel gene: $ratio" 
 	echo -e "Ratio of read mapped in panel gene: $ratio" >> $PREPARATION_BAM_FILE
 	limite_ratio=70
-
-	if [ "$ratio" < "$limite_ratio" ]
-		then
-			echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE
+	
+	if [ "$ratio" < "$limite_ratio" ] then
+			echo -e "Error of library of patent - Stop program : ${name}." >> $PREPARATION_BAM_FILE
+			echo -e "Error of library of patent - Stop program : ${name}."
+			exit 1
 	# Sinon librairie non correcte
 	else
-		echo -e "Error of library of patent - Stop program : ${name}." >> $PREPARATION_BAM_FILE
-		echo -e "Error of library of patent - Stop program : ${name}."
-		exit 1
+		echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE
+		
+		
 	fi
+
 	VERIFY_FILE	tmp/${name}-on-target.bam
 	# Génération des statistiques: compte rendu qualité
 	echo -e "Compte rendu qualité"
-	echo -e "samtools flagstat -@ 8 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat" >> $PREPARATION_BAM_FILE
-	samtools flagstat -@ 8 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat 		
+	echo -e "samtools flagstat -@ 16 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat" >> $PREPARATION_BAM_FILE
+	samtools flagstat -@ 16 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat 		
 	echo -e "Reindexation" >> $PREPARATION_BAM_FILE
-	echo -e "samtools index  -@ 8 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 8-b tmp/${name}-on-target.bam
+	echo -e "samtools index  -@ 16 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
+	samtools index -@ 16 -b tmp/${name}-on-target.bam
 
 	# Marquages des duplicates sans les enlever
 	echo -e "Marquage des duplicates" >> $PREPARATION_BAM_FILE
 	echo -e "java -jar $PICARD MarkDuplicates I= tmp/${name}-on-target.bam O=$name.sort.dupmark.bam M=$name.marked_dup.metrics.txt" >> $PREPARATION_BAM_FILE
 	java -jar $PICARD MarkDuplicates I=tmp/${name}-on-target.bam O=${name}.sort.dupmark.bam M=$name.marked_dup.metrics.txt >> $PREPARATION_BAM_FILE
 	# Reindexation
-	samtools index -@ 8 -b ${name}.sort.dupmark.bam
+	samtools index -@ 16 -b ${name}.sort.dupmark.bam
 	
 	echo "************************************" >> $PREPARATION_BAM_FILE
 	echo "Alignement pour l'échantillon $name terminé" >> $PREPARATION_BAM_FILE

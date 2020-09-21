@@ -469,7 +469,7 @@ function LANCEMENT_QUALITY_BAM () {
 	samtools flagstat -@ 8 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat 		
 	echo -e "Reindexation" >> $PREPARATION_BAM_FILE
 	echo -e "samtools index  -@ 8 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 8-b tmp/${name}-on-target.bam
+	samtools index -@ 8 -b tmp/${name}-on-target.bam
 
 	# Marquages des duplicates sans les enlever
 	echo -e "Marquage des duplicates" >> $PREPARATION_BAM_FILE
