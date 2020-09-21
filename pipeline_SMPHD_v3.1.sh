@@ -362,56 +362,44 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "**********************************************************************\n" > $PREPARATION_BAM_FILE
 	date > $PREPARATION_BAM_FILE
 	echo -e "Génération des Fichiers d'alignement BAM pour ${name}\n" >> $PREPARATION_BAM_FILE
-	mv $name/*.fastq.gz .
+	#mv $name/*.fastq.gz .
 
 	# Récupération des fichiers fastq sens R1 et R2 correspondant à un identifiant
-	R1=$(ls | grep $name | grep _R1_)
-	R2=$(ls | grep $name | grep _R2_)
+	#R1=$(ls | grep $name | grep _R1_)
+	#R2=$(ls | grep $name | grep _R2_)
 
-	echo "R1" >> $PREPARATION_BAM_FILE
-	echo $R1 >> $PREPARATION_BAM_FILE
-	echo "R2" >> $PREPARATION_BAM_FILE
-	echo $R2 >> $PREPARATION_BAM_FILE
+	#echo "R1" >> $PREPARATION_BAM_FILE
+	#echo $R1 >> $PREPARATION_BAM_FILE
+	#echo "R2" >> $PREPARATION_BAM_FILE
+	#echo $R2 >> $PREPARATION_BAM_FILE
 
 	# Déplacement des FASTQ dans le fichier du patient
-	mv $R1 $REPERTORY/$name
-	mv $R2 $REPERTORY/$name
+	#mv $R1 $REPERTORY/$name
+	#mv $R2 $REPERTORY/$name
 
 	#On rentre dans le fichier du  patient
-	echo -e "Lancement Quality bam" >> $LOG
+	#echo -e "Lancement Quality bam" >> $LOG
 	RAPPEL_PATIENT $name
 	echo "Nom du patient analysé ${name}:" >> $PREPARATION_BAM_FILE
 	echo $name >> $PREPARATION_BAM_FILE
-	VERIFY_FILE $REPERTORY/$name/$R1
-	VERIFY_FILE $REPERTORY/$name/$R2
+	#VERIFY_FILE $REPERTORY/$name/$R1
+	#VERIFY_FILE $REPERTORY/$name/$R2
 	# *************************************************
 	# Elaboration du FASTQC pour la patient :
 	# *************************************************
 	# Génération du fichier qualité
-	echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
-	fastqc -o . $R1 $R2 -t 16
-	R1name=$(echo $R1 |cut -f1 -d.)
-	R2name=$(echo $R2 |cut -f1 -d.)
-	echo $R1name
-	echo $R2name
+	#echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
+	#fastqc -o . $R1 $R2 -t 16
+	#R1name=$(echo $R1 |cut -f1 -d.)
+	#R2name=$(echo $R2 |cut -f1 -d.)
+	#echo $R1name
+	#echo $R2name
 	# Extension
 	html="_fastqc.html"
 	# copie des fichiers d'analyse fastqc vers le repertoire qualite
-	cp  $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
-	# Verification fichier
-	if [ $qualite = "OK" ]
-		then
-			# Commande pour validation
-			echo -e "Attente de la validation du fichier générer par fastqc (Quality Control):"
-			echo -e "Afficher OK:  si le fichier de qualité est correcte\nNO: si incorrecte\n ********\n"
-			firefox $REPERTORY/$name/$R1name$html
-			firefox $REPERTORY/$name/$R2name$html
-			VALIDATION
-			echo -e "*******"
-	fi
-
+	#cp  $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
 	# Suppression des fichiers brutes en attente fichier intermediaire
-	rm -dr $REPERTORY/$name/*fastqc.zip 
+	#rm -dr $REPERTORY/$name/*fastqc.zip 
 	#Creation d'un fichier temporaire: Stockage Fichier SAM à BAM de préparation
 	mkdir $REPERTORY/$name/tmp
 	# ****************************************
@@ -424,19 +412,19 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Construction du fichier SAM via BAW-MEM" >>$PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE  
 	echo -e "bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam" >> $PREPARATION_BAM_FILE
-	bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
+	#bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
 	echo -e "Alignement effectué" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE 
 
 	# Génération du fichier bam
 	echo -e "Génération du fichier bam:\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam" >> $PREPARATION_BAM_FILE
-	samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
+	#samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
 	# Tri du fichier
 	echo -e "samtools sort -@ 14 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
-	samtools sort -@ 14 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
-	echo -e "samtools index -@ 8 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 8 -b tmp/${name}.sort.bam
+	#samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
+	echo -e "samtools index -@ 14 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
+	samtools index -@ 14 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
 	# Total of read
@@ -445,18 +433,18 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Total of read : $total" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e " Keep only mapped\n" >> $PREPARATION_BAM_FILE
-	echo -e "samtools view -F 0x4 -@ 14 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam" >> $PREPARATION_BAM_FILE
-	samtools view -F 0x4 -h -@ 1--base-quality-score-threshold4 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
-	echo -e "samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam" >> $PREPARATION_BAM_FILE
-	samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam
+	echo -e "samtools view -F 0x4 -@ 16 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam" >> $PREPARATION_BAM_FILE
+	samtools view -F 0x4 -h -@ 16 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
+	#echo -e "samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam" >> $PREPARATION_BAM_FILE
+	#samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	# Read mapped
 	mapped=$(samtools view -h -c tmp/${name}.sort_mapped.bam)
 	echo -e "Only of map : $mapped" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	# Unmapped and chimeric
-	unmapped=$(samtools view -f 0x4 -h -@ 8 -c -b tmp/${name}.sort.bam)
-	chimeric=$(samtools view  -f 0x800 -h -@ 8 -c -b tmp/${name}.sort.bam)
+	unmapped=$(samtools view -f 0x4 -h -@ 12 -c -b tmp/${name}.sort.bam)
+	chimeric=$(samtools view  -f 0x800 -h -@ 12 -c -b tmp/${name}.sort.bam)
 	echo -e "Only unmapped : $unmapped" >> $PREPARATION_BAM_FILE
 	echo -e "Only chimeric : $chimeric" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -466,13 +454,14 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
 	# Mapped and intersected in region
-	totalmapintersect=$(samtools view -h -c tmp/${name}-on-target.bam )
+	totalmapintersect=$(samtools view -h -@ 16 -c tmp/${name}-on-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
 	ratio=$($totalmapintersect/$mapped*100 | bc -l)
 	echo -e "Ratio of read mapped in panel gene: $ratio" 
 	echo -e "Ratio of read mapped in panel gene: $ratio" >> $PREPARATION_BAM_FILE
 	limite_ratio=70
+
 	if [ "$ratio" < "$limite_ratio" ]
 		then
 			echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE
