@@ -530,7 +530,7 @@ function LANCEMENT_QUALITY_BAM () {
 
 	# Suppresion des fichiers tmp
 	# Suppression du fichier temporaire .sam, du bam ininial et du bam sort_mapped et du bam target
-	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*on-target.bam* tmp/*2048* 
+	#rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*on-target.bam* tmp/*2048* 
 	
 	# Copie des fichiers BAM
 	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai $QUALITY/$name/
