@@ -3,10 +3,9 @@
 # Bioinformatique
 # Laboratoire d'hématologie
 # Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
-# Dernière Modification: 04/08/20
+# Dernière Modification: 21/09/20
 # But :
-# Verification et notation de la prise en compte de NM 007313 à NM05157 de ABL1. 
-# Une réféencxe plus connue dans la littérature
+# Mise à jour cosmic et Pindel NPM1, % target
 # suppresiob variable site qui ne sont plus utilisé (exac, 1000G gardé en achivvage)
 echo "#############################################################"
 echo "#-----------------------------------------------------------#"
@@ -324,6 +323,7 @@ function VERIFY_FILE () {
 		echo -e "Error File doesn't exist stop of analysis of patent"
 		exit 1
 fi
+fi
 }
 
 # ******************************* ANALYSE PIPELINE *****************************************
@@ -439,9 +439,10 @@ function LANCEMENT_QUALITY_BAM () {
 	samtools index -@ 8 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
+	# Total of read
 	total=$(samtools view -h -c tmp/${name}.sort.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
-	echo -e "Total mapped: $total" >> $PREPARATION_BAM_FILE
+	echo -e "Total of read : $total" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e " Keep only mapped\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -F 0x4 -@ 14 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam" >> $PREPARATION_BAM_FILE
@@ -449,19 +450,36 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam" >> $PREPARATION_BAM_FILE
 	samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
+	# Read mapped
 	mapped=$(samtools view -h -c tmp/${name}.sort_mapped.bam)
-	echo -e "Only mapped $mapped" >> $PREPARATION_BAM_FILE
+	echo -e "Only of map : $mapped" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
+	# Unmapped and chimeric
 	unmapped=$(samtools view -f 0x4 -h -@ 8 -c -b tmp/${name}.sort.bam)
 	chimeric=$(samtools view  -f 0x800 -h -@ 8 -c -b tmp/${name}.sort.bam)
-	echo -e "Only unmapped: $unmapped" >> $PREPARATION_BAM_FILE
-	echo -e "Only chimeric: $chimeric" >> $PREPARATION_BAM_FILE
+	echo -e "Only unmapped : $unmapped" >> $PREPARATION_BAM_FILE
+	echo -e "Only chimeric : $chimeric" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE
 	# Intersection avec le fichier du design 
 	# avec les région intronique aussi  pour déceler les mutations de type épissage en plus
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
+	# Mapped and intersected in region
+	totalmapintersect=$(samtools view -h -c tmp/${name}-on-target.bam )
+	echo -e "*******************************" >> $PREPARATION_BAM_FILE
+	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
+	ratio=$($totalmapintersect/$mapped*100 | bc -l)
+	limite_ratio=70
+	if [ "$ratio" < "$limite_ratio" ]
+		then
+			echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE
+	# Sinon librairie non correcte
+	else
+		echo -e "Error of library of patent - Stop program : ${name}." >> $PREPARATION_BAM_FILE
+		echo -e "Error of library of patent - Stop program : ${name}."
+		exit 1
+	fi
 	VERIFY_FILE	tmp/${name}-on-target.bam
 	# Génération des statistiques: compte rendu qualité
 	echo -e "Compte rendu qualité"
