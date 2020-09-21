@@ -322,8 +322,8 @@ function VERIFY_FILE () {
 	else
 		echo -e "Error File doesn't exist stop of analysis of patent"
 		exit 1
-fi
-fi
+	fi
+
 }
 
 # ******************************* ANALYSE PIPELINE *****************************************
