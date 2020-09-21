@@ -352,7 +352,7 @@ function LANCEMENT_QUALITY_BAM () {
 	name=$1
 	
 	# Fichier log de sortie
-	PREPARATION_BAM_FILE=$REPERTORY/$name/log_bam.txt
+	PREPARATION_BAM_FILE=$REPERTORY/$name/log_bam_test_3.1.txt
 	
 	# Création d'un répertoire pour chaque patient
 	mkdir $REPERTORY/$name
@@ -470,6 +470,8 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
 	ratio=$($totalmapintersect/$mapped*100 | bc -l)
+	echo -e "Ratio of read mapped in panel gene: $ratio" 
+	echo -e "Ratio of read mapped in panel gene: $ratio" >> $PREPARATION_BAM_FILE
 	limite_ratio=70
 	if [ "$ratio" < "$limite_ratio" ]
 		then
