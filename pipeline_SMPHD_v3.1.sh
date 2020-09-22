@@ -457,17 +457,21 @@ function LANCEMENT_QUALITY_BAM () {
 	totalmapintersect=$(samtools view -h -@ 16 -c tmp/${name}-on-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
-	echo "($totalmapintersect/$mapped))"
-	ratio=$(echo "$totalmapintersect/$mapped*100" | bc -l)
-	echo -e "Ratio of read mapped in panel gene: $ratio" 
-	echo -e "Ratio of read mapped in panel gene: $ratio" >> $PREPARATION_BAM_FILE
-	limite_ratio=70
-	
-	if [ "$ratio" < "$limite_ratio" ] then
-			echo -e "Error of library of patent - Stop program : ${name}." >> $PREPARATION_BAM_FILE
-			echo -e "Error of library of patent - Stop program : ${name}."
-			exit 1
-	# Sinon librairie non correcte
+	# Calcul du ratio 
+	ratio=$(echo "($totalmapintersect/$mapped)*100" | bc -l )
+	# Conversion float to int to comparison
+	int_ratio=${ratio%.*}
+	echo -e "Ratio of read mapped in panel gene: $int_ratio" >> $PREPARATION_BAM_FILE
+	limite_ratio=70 
+	echo -e "Seuil ratio of read mapped in panel gene: $limite_ratio" >> $PREPARATION_BAM_FILE
+	# Condition
+	# Librairie non correcte
+	if [ "$int_ratio" -lt "$limite_ratio" ] 
+		then
+		echo -e "Error of library of patent - Stop program : ${name}. ratio of map intersect is only ${ratio}." >> $PREPARATION_BAM_FILE
+		echo -e "Error of library of patent - Stop program : ${name}."
+		exit 1
+	# Sinon librairie correcte
 	else
 		echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE
 		
