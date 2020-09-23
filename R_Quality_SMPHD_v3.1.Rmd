@@ -16,6 +16,8 @@ params:
         value: x
     output_gene:
         value: x
+    ratio_library:
+        value: x
 
 ---
 
@@ -117,6 +119,10 @@ row.names(matrice_gene) =c(paste(patient,"med",sep="_"),paste(patient,">200",sep
 write.table(matrice_gene,params$output_gene,sep=",",append=TRUE,col.names=FALSE)
 
 ```
+
+
+
+* Ratio library in target = `r params$ratio_library` %
 
 * Profondeur Mediane = `r median`
 

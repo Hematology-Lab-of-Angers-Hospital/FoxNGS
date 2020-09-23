@@ -362,44 +362,44 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "**********************************************************************\n" > $PREPARATION_BAM_FILE
 	date > $PREPARATION_BAM_FILE
 	echo -e "Génération des Fichiers d'alignement BAM pour ${name}\n" >> $PREPARATION_BAM_FILE
-	#mv $name/*.fastq.gz .
+
+	# Si relancement d'un patient redéplacement dans le dossier des résultats pour l'analyse
+	mv $name/*.fastq.gz .
 
 	# Récupération des fichiers fastq sens R1 et R2 correspondant à un identifiant
-	#R1=$(ls | grep $name | grep _R1_)
-	#R2=$(ls | grep $name | grep _R2_)
+	R1=$(ls | grep $name | grep _R1_)
+	R2=$(ls | grep $name | grep _R2_)
 
-	#echo "R1" >> $PREPARATION_BAM_FILE
-	#echo $R1 >> $PREPARATION_BAM_FILE
-	#echo "R2" >> $PREPARATION_BAM_FILE
-	#echo $R2 >> $PREPARATION_BAM_FILE
+	echo "R1" >> $PREPARATION_BAM_FILE
+	echo $R1 >> $PREPARATION_BAM_FILE
+	echo "R2" >> $PREPARATION_BAM_FILE
+	echo $R2 >> $PREPARATION_BAM_FILE
 
 	# Déplacement des FASTQ dans le fichier du patient
-	#mv $R1 $REPERTORY/$name
-	#mv $R2 $REPERTORY/$name
+	mv $R1 $REPERTORY/$name
+	mv $R2 $REPERTORY/$name
 
 	#On rentre dans le fichier du  patient
 	#echo -e "Lancement Quality bam" >> $LOG
 	RAPPEL_PATIENT $name
 	echo "Nom du patient analysé ${name}:" >> $PREPARATION_BAM_FILE
 	echo $name >> $PREPARATION_BAM_FILE
-	#VERIFY_FILE $REPERTORY/$name/$R1
-	#VERIFY_FILE $REPERTORY/$name/$R2
+	VERIFY_FILE $REPERTORY/$name/$R1
+	VERIFY_FILE $REPERTORY/$name/$R2
 	# *************************************************
 	# Elaboration du FASTQC pour la patient :
 	# *************************************************
 	# Génération du fichier qualité
-	#echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
-	#fastqc -o . $R1 $R2 -t 16
-	#R1name=$(echo $R1 |cut -f1 -d.)
-	#R2name=$(echo $R2 |cut -f1 -d.)
-	#echo $R1name
-	#echo $R2name
+	echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
+	fastqc -o . $R1 $R2 -t 16
+	R1name=$(echo $R1 |cut -f1 -d.)
+	R2name=$(echo $R2 |cut -f1 -d.)
 	# Extension
 	html="_fastqc.html"
 	# copie des fichiers d'analyse fastqc vers le repertoire qualite
-	#cp  $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
+	cp REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
 	# Suppression des fichiers brutes en attente fichier intermediaire
-	#rm -dr $REPERTORY/$name/*fastqc.zip 
+	rm -dr $REPERTORY/$name/*fastqc.zip 
 	#Creation d'un fichier temporaire: Stockage Fichier SAM à BAM de préparation
 	mkdir $REPERTORY/$name/tmp
 	# ****************************************
@@ -412,19 +412,19 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Construction du fichier SAM via BAW-MEM" >>$PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE  
 	echo -e "bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam" >> $PREPARATION_BAM_FILE
-	#bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
+	bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
 	echo -e "Alignement effectué" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE 
 
 	# Génération du fichier bam
 	echo -e "Génération du fichier bam:\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam" >> $PREPARATION_BAM_FILE
-	#samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
+	samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
 	# Tri du fichier
 	echo -e "samtools sort -@ 14 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
-	#samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
-	echo -e "samtools index -@ 14 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
-	#samtools index -@ 14 -b tmp/${name}.sort.bam
+	samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
+	echo -e "samtools index -@ 16 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
+	samtools index -@ 16 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
 	# Total of read
@@ -434,7 +434,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e " Keep only mapped\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -F 0x4 -@ 16 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam" >> $PREPARATION_BAM_FILE
-	#samtools view -F 0x4 -h -@ 16 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
+	samtools view -F 0x4 -h -@ 16 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
 	#echo -e "samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam" >> $PREPARATION_BAM_FILE
 	#samtools view -f 0x800 -@ 10 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -452,7 +452,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# Intersection avec le fichier du design 
 	# avec les région intronique aussi  pour déceler les mutations de type épissage en plus
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
-	#$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
+	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
 	# Mapped and intersected in region
 	totalmapintersect=$(samtools view -h -@ 16 -c tmp/${name}-on-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -462,7 +462,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# Conversion float to int to comparison
 	int_ratio=${ratio%.*}
 	echo -e "Ratio of read mapped in panel gene: $int_ratio" >> $PREPARATION_BAM_FILE
-	limite_ratio=70 
+	limite_ratio=60 
 	echo -e "Seuil ratio of read mapped in panel gene: $limite_ratio" >> $PREPARATION_BAM_FILE
 	# Condition
 	# Librairie non correcte
@@ -470,12 +470,9 @@ function LANCEMENT_QUALITY_BAM () {
 		then
 		echo -e "Error of library of patent - Stop program : ${name}. ratio of map intersect is only ${ratio}." >> $PREPARATION_BAM_FILE
 		echo -e "Error of library of patent - Stop program : ${name}."
-		exit 1
 	# Sinon librairie correcte
 	else
-		echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE
-		
-		
+		echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE	
 	fi
 
 	VERIFY_FILE	tmp/${name}-on-target.bam
@@ -507,9 +504,9 @@ function LANCEMENT_QUALITY_BAM () {
 	# ****************************************************
 	# Analyse de la qualité de coverage Rmarkdown 
 	echo -e "R -e rmarkdown::render('${RSCRIPT}', 
-		params = list( directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='$0',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv'),
+	params = list( directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='$0',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),
 		output_file='$(pwd)/${name}_couverture_analyse.bed.html')" >> $PREPARATION_BAM_FILE
-	R -e "rmarkdown::render('${RSCRIPT}', params = list(directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='${0}',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv'),output_file='$(pwd)/${name}_couverture_analyse.bed.html')"
+	R -e "rmarkdown::render('${RSCRIPT}', params = list(directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='${0}',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),output_file='$(pwd)/${name}_couverture_analyse.bed.html')"
 
 	echo -e "**********************************************************************\n" >> $PREPARATION_BAM_FILE
 	# Copie vers le répertoire qualité
