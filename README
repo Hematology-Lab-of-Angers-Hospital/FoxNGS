@@ -1,11 +1,11 @@
 # ************************************************
 #  Pipeline bioinformatique SMPHD                 
 #	Données SURESELECQTX                  
-#    Version 3.0 
+#    Version 3.1 
 # Nouveau pipeline de routine 
 # ************************************************
 # Amelioration
 # *********************************
-- Amélioration du menu de lancement du pipeline
-- Inclusion de cosmic 91 à la place de cosmic 90
-- Remplacement de la database clinvar 20200316 à la place de clinvar20190305
+- Recherche de NPM1 W288 e de KMT22A
+- Inclusion de cosmic 92 en plus de cosmic 91
+- % of target

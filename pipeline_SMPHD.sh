@@ -754,7 +754,7 @@ function LANCEMENT_ANNOTATION () {
 	Annovar $name $METHODE3
 	# Pindel 
 	# ****************
-	# Only in CALR  
+	# Only in CALR FLT3 NPM1 KMT2A
 	Annovar $name $METHODE4
 
 	date >> $ANNOTATION_FILE

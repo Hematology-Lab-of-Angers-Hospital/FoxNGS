@@ -297,17 +297,25 @@ def filter_annotation_dico(annotation,out,method):
 	# ****************
 	#Pindel
 	# To keep
-	# FLT3 exon 14: chr13:28608219-28608351
-	# FLT3 exon 15: chr13:28608024-28608128
+	# FLT3 exon 14: chr13:28608219-28608351 1%
+	# FLT3 exon 15: chr13:28608024-28608128	1%
 	FLT3_type = ["INS","DUP:TANDEM"]
-	# CALR exon 9 ch19:13054527-13055303
+	FLT3_VAF = 0.01
+	# CALR exon 9 ch19:13054527-13055303 pour CALR 2% 
 	CALR_type = ["DEL"]
+	# W288 recherche Hotspot	1%
+	NPM1_TYPE = ["INS"]
+	NPM1_VAF = 0.01
+	# KMT2A 2 %
+	KMT2A_TYPE = ["INS","DUP:TANDEM"]
+	
 	#initialization of list of line removed by filter
 	remove = []
 	i = 0
 	name_VAF = "VAF"
 	# Filtre des VAF <2% sont eliminées
 	Filter_VAF = 0.02
+	
 	
 	# Filter
 	# Pour le dictionnaire ne pas enlever les polymorphismes
@@ -327,21 +335,24 @@ def filter_annotation_dico(annotation,out,method):
 			remove.append(i)
 		
 		elif method == "Pindel":
-			# Cas chr13:FLT3
+			# Cas chr13:FLT3 Exon 14 and 15 
 			# premier filtre sur le type
 			if annotation.loc[i,"Gene.refGene"] == "FLT3" and annotation.loc[i,"SVTYPE"] not in FLT3_type:
 				remove.append(i)
 			# Deuxieme filtre sur lA VAF
-			if annotation.loc[i,"Gene.refGene"] == "FLT3"and annotation.loc[i,name_VAF] < 0.01:
+			if annotation.loc[i,"Gene.refGene"] == "FLT3" and annotation.loc[i,name_VAF] < FLT3_VAF:
 				remove.append(i)
 			# Cas chr19 CALR
 			# premier filtre sur le type
-			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,"SVTYPE"] not in CALR_type:
+			if annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,"SVTYPE"] not in CALR_type:
 				remove.append(i)	
 			# Deuxieme filtre sur lA VAF
-			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF:
+			if annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF:
 				remove.append(i)
-			# Passge du filtre
+			# NPM1 Exon 11 W288
+			
+			#KMT2A
+			# Passage du filtre
 			else:	
 				annotation.loc[i,"FILTER"]="PASS"
 
@@ -443,7 +454,7 @@ def Fusion_file(data1,data2,data3,data4,all_file,output):
 	liste_VAF = ["Mean_VAF","Mean_DP","Method_Variant_GATK","Total_DP_GATK","VAF_GATK","Method_Variant_Mutect2","Total_DP_Mutect2","VAF_Mutect2","Method_Variant_Varscan","Total_DP_Varscan","VAF_Varscan","Method_Variant_Pindel","Total_DP_Pindel","VAF_Pindel"]
 	liste_annot = ["CHROM","Validation_BIO_ING","Classification_mutation","cytoBand","IGV","POS","REF","ALT","Func.refGene","Gene.refGene","ExonicFunc.refGene","AAChange.refGene"]
 	liste_methode = ["Method_Variant_GATK","Method_Variant_Mutect2","Method_Variant_Varscan","Method_Variant_Pindel"]
-	liste_annotation = ["ID_cosmic91","OCC_cosmic91","ID_cosmic89","OCC_cosmic89","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
+	liste_annotation = ["ID_cosmic92","OCC_cosmic92","ID_cosmic91","OCC_cosmic91","ID_cosmic89","OCC_cosmic89","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
 	for i in liste_annot:
 		reorder.append(i)
 	# Ajout des VAF seulement et pas de Methode variant
@@ -570,7 +581,7 @@ def final_statistic_database (name_patient,file_database,dico_annotation,out):
 	# Liste méthode (necessaire suppresion)
 	liste_methode = ["Method_Variant_GATK","Method_Variant_Mutect2","Method_Variant_Varscan","Method_Variant_Pindel"]
 	# Liste annotation secondaire
-	liste_annotation = ["ID_cosmic91","OCC_cosmic91","ID_cosmic89","OCC_cosmic89","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
+	liste_annotation = ["ID_cosmic92","OCC_cosmic92","ID_cosmic91","OCC_cosmic91","ID_cosmic89","OCC_cosmic89","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
 	for i in liste_annot:
 		reorder.append(i)
 	# Ajout des VAF seulement et pas de Methode variant
@@ -856,7 +867,7 @@ if __name__ == '__main__':
 		final_statistic_database(args.file,args.database,dico_annotation,args.out)
 	# Error
 	else:
-		print("error or call of function")
+		print("Error or call of function")
 		sys.exit(1)
 	print("Le programme a traité le fichier {:30s}.".format(args.file))
 	sys.exit(0)
