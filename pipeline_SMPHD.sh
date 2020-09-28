@@ -155,7 +155,7 @@ function DATABASE () {
 	PICARD=~/BioNGSTools/picard/picard.jar
 	
 	# Analyse qualité - Script R
-	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/R_Quality_SMPHD_v3.0.Rmd
+	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_Routine/R_Quality_SMPHD.Rmd
 	# Caller
 
 	VARSCAN=~/BioNGSTools/varscan/VarScan.v2.4.3.jar
@@ -168,9 +168,9 @@ function DATABASE () {
 	# Préparation de l'Annotation
 	VCFTOCSV=~/BioNGSTools/VCF-Simplify/VCF-Simplify.py
 	# Annotation
-	TRAIT_ANNOT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/Treatment_of_Annotation_v3.0.py
+	TRAIT_ANNOT=~/Bureau/Recherche/Pipeline/SMPHD_Routine/Treatment_of_Annotation.py
 	EXIST_FILE=~/Bureau/Recherche/Script/exist_file.sh
-	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/database_dictionnary_v3.0.py
+	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_Routine/database_dictionnary.py
 	# ********************************************
 	# Database 
 	# Fichier
