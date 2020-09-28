@@ -193,8 +193,8 @@ function DATABASE () {
 	# Changement de nom 
 	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_27_07_20-v3.0.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_statistic_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Statistic_Database_dictionnary.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Dictionnary_Database_variant.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
