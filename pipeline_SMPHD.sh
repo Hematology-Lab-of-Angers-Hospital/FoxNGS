@@ -26,9 +26,9 @@ echo "#############################################################"
 function HELP {
 	echo -e "Pipeline bioinformatique SMPHD"
 	echo -e "Lancement du pipeline HD"
-	echo -e "./pipeline_SMPHD_v3.0.sh"
+	echo -e "./pipeline_SMPHD.sh"
 	echo -e "Un menu demandera les paramètres à rentrer"
-	echo -e "Version 3.0"
+	echo -e "Version 3.1"
 	echo -e "Cette nouvelle version contient la création d'un dictionnaire"
 	echo -e "La mise à jour de Cosmic 91 à la place de Cosmic 90 et de clinvar"
 	echo -e " Si une modification de database ou d'appel de software a été modifié."
@@ -73,7 +73,7 @@ function CREATION_RECHERCHE_FILE () {
 	REPERTORY=${RUN}/${SORTIE}
 	mkdir $REPERTORY 
 
-	LOG=$REPERTORY/log_pipeline_SMPHD_v3.0.txt
+	LOG=$REPERTORY/log_pipeline_SMPHD_v3.1.txt
 	WORKFLOW=$REPERTORY/Workfow.xml
 	CONFIGURATION=$REPERTORY/Configuration_file
 	DESIGN=$REPERTORY/Experimental_Design
@@ -154,7 +154,7 @@ function DATABASE () {
 	PICARD=~/BioNGSTools/picard/picard.jar
 	
 	# Analyse qualité - Script R
-	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/R_Quality_SMPHD_v3.1.Rmd
+	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_Routine/R_Quality_SMPHD.Rmd
 	# Caller
 
 	VARSCAN=~/BioNGSTools/varscan/VarScan.v2.4.3.jar
@@ -167,9 +167,9 @@ function DATABASE () {
 	# Préparation de l'Annotation
 	VCFTOCSV=~/BioNGSTools/VCF-Simplify/VCF-Simplify.py
 	# Annotation
-	TRAIT_ANNOT=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/Treatment_of_Annotation_v3.1.py
+	TRAIT_ANNOT=~/Bureau/Recherche/Pipeline/SMPHD_Routine/Treatment_of_Annotation.py
 	EXIST_FILE=~/Bureau/Recherche/Script/exist_file.sh
-	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_v3.0/database_dictionnary_v3.1.py
+	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_Routine/database_dictionnary.py
 	# ********************************************
 	# Database 
 	# Fichier
@@ -229,7 +229,7 @@ function TEST_PARA () {
 # Menu 
 function INTERFACE () {
 	echo "****************************************************"
-	echo "Pipeline d'analyse des Données SURESELECT SMPHD version 3.0 "
+	echo "Pipeline d'analyse des Données SURESELECT SMPHD version 3.1 "
 	echo "****************************************************"
 	echo "Saisie des Données de lancement du RUN :"
 	echo "********"
@@ -543,7 +543,7 @@ function LANCEMENT_VARIANT_CALLING () {
 	name=$1
 	mkdir $QUALITY/$name
 	# Fichier de sortie 
-	VARIANT_FILE=$REPERTORY/$name/logvariantcalling.txt
+	VARIANT_FILE=$REPERTORY/$name/logvariantcalling_3.1.txt
 	# function RAPPEL patient
 	echo -e "Lancement Variant_calling" >> $LOG
 	RAPPEL_PATIENT $name
@@ -732,7 +732,7 @@ function LANCEMENT_ANNOTATION () {
 	echo -e "Lancement Annotation" >> $LOG
 	RAPPEL_PATIENT $name
 	# Fichier de sortie
-	ANNOTATION_FILE=$REPERTORY/$name/log_annotation.txt
+	ANNOTATION_FILE=$REPERTORY/$name/log_annotation_3.1.txt
 	echo -e "************************************************\n" > $ANNOTATION_FILE
 	echo -e "Lancement annotation ANNOVAR:" >> $ANNOTATION_FILE
 	date >> $ANNOTATION_FILE
