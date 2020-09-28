@@ -27,7 +27,7 @@ echo "#############################################################"
 function HELP {
 	echo -e "Pipeline bioinformatique SMPHD"
 	echo -e "Lancement du pipeline HD"
-	echo -e "./pipeline_SMPHD_v3.0.sh"
+	echo -e "./pipeline_SMPHD.sh"
 	echo -e "Un menu demandera les paramètres à rentrer"
 	echo -e "Version 3.0"
 	echo -e "Cette nouvelle version contient la création d'un dictionnaire"
