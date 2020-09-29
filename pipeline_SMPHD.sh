@@ -178,7 +178,7 @@ function DATABASE () {
 	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel.bed
 	# Variant
 	# Fichier Bed Pindel Ajout de NPM1
-	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15_NPM1_KMT2A.bed
+	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15.bed
 	DBSNP=/media/t-chu-027/DATAPART2/Database/DB/dbsnp_138.hg19.vcf
 
 	# Annotation
@@ -189,8 +189,7 @@ function DATABASE () {
 	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_27-07-20.csv
 	BASE_ARTEFACT=$ANNOTATION_REP/Artefact/Base_artefact_120220.csv
 	# Dictionnaire annotation 
-	# Changement de nom 
-	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_27_07_20-v3.0.json
+	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_28_09_20.json
 	# Exit Database Result
 	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_statistic_dictionnary.csv
 	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_Database_variant.json
@@ -565,73 +564,71 @@ function LANCEMENT_VARIANT_CALLING () {
 	# Preparation varscan
 	#  the following command lines call SNPs and short INDEL
 	echo -e "samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f $BWA_FASTA ${name}.sort.dupmark.bam > variant/${METHODE3}/${name}.${METHODE3}.mpileup" >> $VARIANT_FILE 
-	#samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f $BWA_FASTA ${name}.sort.dupmark.bam > variant/${METHODE3}/${name}.${METHODE3}.mpileup
-
-
-	#echo "java -jar $VARSCAN mpileup2cns variant/${METHODE3}/${name}.${METHODE3}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > variant/${METHODE3}/${name}.${METHODE3}.vcf" >> $VARIANT_FILE
-	#java -jar $VARSCAN mpileup2cns variant/${METHODE3}/${name}.${METHODE3}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > variant/${METHODE3}/${name}.${METHODE3}.vcf
+	samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f $BWA_FASTA ${name}.sort.dupmark.bam > variant/${METHODE3}/${name}.${METHODE3}.mpileup
+	echo "java -jar $VARSCAN mpileup2cns variant/${METHODE3}/${name}.${METHODE3}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > variant/${METHODE3}/${name}.${METHODE3}.vcf" >> $VARIANT_FILE
+	java -jar $VARSCAN mpileup2cns variant/${METHODE3}/${name}.${METHODE3}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > variant/${METHODE3}/${name}.${METHODE3}.vcf
 	#VERIFY_FILE variant/${METHODE3}/${name}.${METHODE3}.vcf
 	echo -e "Variant calling ${METHODE3} terminé\n" >> $VARIANT_FILE
 	date >> $VARIANT_FILE
 	# Supprimer File
-	#rm variant/${METHODE3}/${name}.${METHODE3}.mpileup
+	rm variant/${METHODE3}/${name}.${METHODE3}.mpileup
 	# ******************************************
 	# Détection par GATK
 	# ******************************************
-	#mkdir variant/${METHODE1}
-	#echo -e " ***************************" >> $VARIANT_FILE
-	#echo "Variant calling (GATK)"
-	#echo "Variant calling (GATK)" >> $VARIANT_FILE
-	#echo "Start à :" >> $VARIANT_FILE
-	#date >> $VARIANT_FILE
+	mkdir variant/${METHODE1}
+	echo -e " ***************************" >> $VARIANT_FILE
+	echo "Variant calling (GATK)"
+	echo "Variant calling (GATK)" >> $VARIANT_FILE
+	echo "Start à :" >> $VARIANT_FILE
+	date >> $VARIANT_FILE
 
 	# Recalibration
-	#echo -e "Recalibration\n"  >> $VARIANT_FILE
-	#echo -e "java -jar $GATK BaseRecalibrator 
-	#		-I ${name}.sort.dupmark.bam 
-	#		-R $BWA_FASTA 
-	#		--known-sites $DBSNP 
-	#		-O variant/${METHODE1}/${name}_recal_data.table" >> $VARIANT_FILE
-	#java -jar $GATK BaseRecalibrator \
-	#	-I ${name}.sort.dupmark.bam \
-	#	-R $BWA_FASTA \
-	#	--known-sites $DBSNP \
-	#	-O variant/${METHODE1}/${name}_recal_data.table
+	echo -e "Recalibration\n"  >> $VARIANT_FILE
+	echo -e "java -jar $GATK BaseRecalibrator 
+			-I ${name}.sort.dupmark.bam 
+			-R $BWA_FASTA 
+			--known-sites $DBSNP 
+			-O variant/${METHODE1}/${name}_recal_data.table" >> $VARIANT_FILE
+	java -jar $GATK BaseRecalibrator \
+		-I ${name}.sort.dupmark.bam \
+		-R $BWA_FASTA \
+		--known-sites $DBSNP \
+		-O variant/${METHODE1}/${name}_recal_data.table
 	#Note for hg19 we use dbSNP138 because last release dbSNP 152 contain more error!!!
-	#echo -e "Apply BQSR\n"  >> $VARIANT_FILE	
-	#echo -e "java -jar $GATK ApplyBQSR 
-	#			-I ${name}.sort.dupmark.bam 
-	#			-R $BWA_FASTA 
-	#			-bqsr variant/${METHODE1}/${name}_recal_data.table 
-	#			-O variant/${METHODE1}/${name}.bqsr.bam"	>> $VARIANT_FILE	
-	#java -jar $GATK ApplyBQSR \
-	#	-I ${name}.sort.dupmark.bam \
-	#	-R $BWA_FASTA \
-	#	-bqsr variant/${METHODE1}/${name}_recal_data.table \
-	#	-O variant/${METHODE1}/${name}.bqsr.bam
+	echo -e "Apply BQSR\n"  >> $VARIANT_FILE	
+	echo -e "java -jar $GATK ApplyBQSR 
+				-I ${name}.sort.dupmark.bam 
+				-R $BWA_FASTA 
+				-bqsr variant/${METHODE1}/${name}_recal_data.table 
+				-O variant/${METHODE1}/${name}.bqsr.bam"	>> $VARIANT_FILE	
+	java -jar $GATK ApplyBQSR \
+		-I ${name}.sort.dupmark.bam \
+		-R $BWA_FASTA \
+		-bqsr variant/${METHODE1}/${name}_recal_data.table \
+		-O variant/${METHODE1}/${name}.bqsr.bam
 
-	#echo -e "Haplotype caller\n"  >> $VARIANT_FILE
-	#echo -e "java -jar $GATK HaplotypeCaller  \
-	#		-R $BWA_FASTA \
-	#		-I variant/${METHODE1}/$name.bqsr.bam \
-	#		--native-pair-hmm-threads 16 \
-	#		-O variant/${METHODE1}/${name}.${METHODE1}.vcf \
-	#		--min-base-quality-score 30 \
-	#		--minimum-mapping-quality 20 \
-	#	    --dont-use-soft-clipped-bases true" >> $VARIANT_FILE
-	#java -jar $GATK HaplotypeCaller  \
-	#	-R $BWA_FASTA \
-	#	-I variant/${METHODE1}/$name.bqsr.bam \
-	#	--native-pair-hmm-threads 16 \
-	#	-O variant/${METHODE1}/${name}.${METHODE1}.vcf \
-	#	--min-base-quality-score 30 \
-	#	--minimum-mapping-quality 20 \
-	#	--dont-use-soft-clipped-bases true
+	echo -e "Haplotype caller\n"  >> $VARIANT_FILE
+	echo -e "java -jar $GATK HaplotypeCaller  \
+			-R $BWA_FASTA \
+			-I variant/${METHODE1}/$name.bqsr.bam \
+			--native-pair-hmm-threads 16 \
+			-O variant/${METHODE1}/${name}.${METHODE1}.vcf \
+			--min-base-quality-score 30 \
+			--minimum-mapping-quality 20 \
+		    --dont-use-soft-clipped-bases true" >> $VARIANT_FILE
+	java -jar $GATK HaplotypeCaller  \
+		-R $BWA_FASTA \
+		-I variant/${METHODE1}/$name.bqsr.bam \
+		--native-pair-hmm-threads 16 \
+		-O variant/${METHODE1}/${name}.${METHODE1}.vcf \
+		--min-base-quality-score 30 \
+		--minimum-mapping-quality 20 \
+		--dont-use-soft-clipped-bases true
 	#remove date
-	#awk '{gsub(",Date=[^>]+>",">");}1' variant/${METHODE1}/$name.${METHODE1}.vcf
-	#VERIFY_FILE variant/${METHODE1}/${name}.${METHODE1}.vcf
-	#date >> $VARIANT_FILE
-	#rm variant/${METHODE1}/$name.bqsr.bam variant/${METHODE1}/$name.bqsr.bai
+	awk '{gsub(",Date=[^>]+>",">");}1' variant/${METHODE1}/$name.${METHODE1}.vcf
+	VERIFY_FILE variant/${METHODE1}/${name}.${METHODE1}.vcf
+	date >> $VARIANT_FILE
+	rm variant/${METHODE1}/$name.bqsr.bam variant/${METHODE1}/$name.bqsr.bai
 	# *************************************
 	# MUTECT2
 	# *************************************
@@ -639,14 +636,14 @@ function LANCEMENT_VARIANT_CALLING () {
 	mkdir variant/${METHODE2}
 	date >> $VARIANT_FILE
 	# Suppression des anciens fichiers
-	#rm variant/${METHODE2}/${name}.${METHODE2}.vcf.gz variant/${METHODE2}/${name}.${METHODE2}.vcf
-	#echo -e " ***************************" >> $VARIANT_FILE
-	#echo -e "MUTECT2" >> $VARIANT_FILE
-	#echo -e "java -jar $GATK Mutect2 -R $BWA_FASTA -I ${name}.sort.dupmark.bam  --min-base-quality-score 30 --native-pair-hmm-threads 16 --dont-use-soft-clipped-bases true -O variant/${METHODE2}/${name}.${METHODE2}.vcf.gz" >> $VARIANT_FILE
-	#java -jar $GATK Mutect2 -R $BWA_FASTA -I ${name}.sort.dupmark.bam --min-base-quality-score 30 --dont-use-soft-clipped-bases true --native-pair-hmm-threads 16 -O variant/${METHODE2}/${name}.${METHODE2}.vcf.gz
-	#echo -e "gunzip variant/${METHODE2}/${name}.${METHODE2}.vcf.gz" >> $VARIANT_FILE
-	#gunzip variant/${METHODE2}/${name}.${METHODE2}.vcf.gz
-	#VERIFY_FILE variant/${METHODE2}/${name}.${METHODE2}.vcf
+	rm variant/${METHODE2}/${name}.${METHODE2}.vcf.gz variant/${METHODE2}/${name}.${METHODE2}.vcf
+	echo -e " ***************************" >> $VARIANT_FILE
+	echo -e "MUTECT2" >> $VARIANT_FILE
+	echo -e "java -jar $GATK Mutect2 -R $BWA_FASTA -I ${name}.sort.dupmark.bam  --min-base-quality-score 30 --native-pair-hmm-threads 16 --dont-use-soft-clipped-bases true -O variant/${METHODE2}/${name}.${METHODE2}.vcf.gz" >> $VARIANT_FILE
+	java -jar $GATK Mutect2 -R $BWA_FASTA -I ${name}.sort.dupmark.bam --min-base-quality-score 30 --dont-use-soft-clipped-bases true --native-pair-hmm-threads 16 -O variant/${METHODE2}/${name}.${METHODE2}.vcf.gz
+	echo -e "gunzip variant/${METHODE2}/${name}.${METHODE2}.vcf.gz" >> $VARIANT_FILE
+	gunzip variant/${METHODE2}/${name}.${METHODE2}.vcf.gz
+	VERIFY_FILE variant/${METHODE2}/${name}.${METHODE2}.vcf
 	# Test Filter Mutect Call
 	#java -jar $GATK Mutect2 FilterMutectCalls -V variant/${METHODE2}/${name}.${METHODE2}.vcf -R $BWA_FASTA -O variant/${METHODE2}/${name}.${METHODE2}_filter.vcf 
 
@@ -744,17 +741,17 @@ function LANCEMENT_ANNOTATION () {
 	mkdir $NAME_REP_ANNOVAR
 	# GATK
 	# ****************
-	#Annovar $name $METHODE1
+	Annovar $name $METHODE1
 	# Mutect
 	# ****************
-	#Annovar $name $METHODE2
+	Annovar $name $METHODE2
 	# Varscan
 	# ****************
-	#Annovar $name $METHODE3
+	Annovar $name $METHODE3
 	# Pindel 
 	# ****************
 	# Only in CALR FLT3 NPM1 KMT2A
-	#Annovar $name $METHODE4
+	Annovar $name $METHODE4
 
 	date >> $ANNOTATION_FILE
 	# Dictionnary of information by biologist artefact 
