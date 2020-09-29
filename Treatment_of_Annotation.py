@@ -307,7 +307,7 @@ def filter_annotation_dico(annotation,out,method):
 	NPM1_TYPE = ["INS"]
 	NPM1_VAF = 0.01
 	# KMT2A 2 %
-	KMT2A_TYPE = ["INS","DUP:TANDEM"]
+	KMT2A_TYPE = ["DEL","DUP:TANDEM"]
 	
 	#initialization of list of line removed by filter
 	remove = []
