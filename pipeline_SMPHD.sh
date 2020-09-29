@@ -5,7 +5,7 @@
 # Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
 # Dernière Modification: 21/09/20
 # But :
-# Mise à jour cosmic et Pindel NPM1, % target
+# Mise à jour cosmic, % target
 # suppresiob variable site qui ne sont plus utilisé (exac, 1000G gardé en achivvage)
 echo "#############################################################"
 echo "#-----------------------------------------------------------#"
@@ -191,8 +191,8 @@ function DATABASE () {
 	# Dictionnaire annotation 
 	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_28_09_20.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_statistic_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Statistic_Database_dictionnary.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Dictionnary_Database_variant.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
@@ -420,7 +420,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam" >> $PREPARATION_BAM_FILE
 	samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
 	# Tri du fichier
-	echo -e "samtools sort -@ 14 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
+	echo -e "samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
 	samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
 	echo -e "samtools index -@ 16 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
 	samtools index -@ 16 -b tmp/${name}.sort.bam
