@@ -350,8 +350,18 @@ def filter_annotation_dico(annotation,out,method):
 			if annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF:
 				remove.append(i)
 			# NPM1 Exon 11 W288
+			if annotation.loc[i,"Gene.refGene"] == "NPM1" and annotation.loc[i,"SVTYPE"] not in NPM1_TYPE:
+				remove.append(i)	
+			# Deuxieme filtre sur lA VAF
+			if annotation.loc[i,"Gene.refGene"] == "NPM1" and annotation.loc[i,name_VAF] < NPM1_VAF:
+				remove.append(i)
 			
 			#KMT2A
+			if annotation.loc[i,"Gene.refGene"] == "KMT2A" and annotation.loc[i,"SVTYPE"] not in KMT2A_TYPE:
+				remove.append(i)	
+			# Deuxieme filtre sur lA VAF
+			if annotation.loc[i,"Gene.refGene"] == "KMT2A" and annotation.loc[i,name_VAF] < Filter_VAF:
+				remove.append(i)
 			# Passage du filtre
 			else:	
 				annotation.loc[i,"FILTER"]="PASS"

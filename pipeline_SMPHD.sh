@@ -754,7 +754,7 @@ function LANCEMENT_ANNOTATION () {
 	# Pindel 
 	# ****************
 	# Only in CALR FLT3 NPM1 KMT2A
-	Annovar $name $METHODE4
+	#Annovar $name $METHODE4
 
 	date >> $ANNOTATION_FILE
 	# Dictionnary of information by biologist artefact 
