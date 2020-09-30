@@ -397,7 +397,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# Extension
 	html="_fastqc.html"
 	# copie des fichiers d'analyse fastqc vers le repertoire qualite
-	cp REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
+	cp $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
 	# Verification fichier
 	if [ $qualite = "OK" ]
 		then
