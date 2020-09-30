@@ -396,7 +396,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# Extension
 	html="_fastqc.html"
 	# copie des fichiers d'analyse fastqc vers le repertoire qualite
-	cp REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
+	cp $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
 	# Suppression des fichiers brutes en attente fichier intermediaire
 	rm -dr $REPERTORY/$name/*fastqc.zip 
 	#Creation d'un fichier temporaire: Stockage Fichier SAM à BAM de préparation
