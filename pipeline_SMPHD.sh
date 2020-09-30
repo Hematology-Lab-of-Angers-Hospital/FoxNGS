@@ -379,7 +379,7 @@ function LANCEMENT_QUALITY_BAM () {
 	mv $R2 $REPERTORY/$name
 
 	#On rentre dans le fichier du  patient
-	#echo -e "Lancement Quality bam" >> $LOG
+	echo -e "Lancement Quality bam" >> $LOG
 	RAPPEL_PATIENT $name
 	echo "Nom du patient analysé ${name}:" >> $PREPARATION_BAM_FILE
 	echo $name >> $PREPARATION_BAM_FILE
@@ -391,12 +391,10 @@ function LANCEMENT_QUALITY_BAM () {
 	# Génération du fichier qualité
 	echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
 	fastqc -o . $R1 $R2 -t 16
-	R1name=$(echo $R1 |cut -f1 -d.)
-	R2name=$(echo $R2 |cut -f1 -d.)
 	# Extension
 	html="_fastqc.html"
-	# copie des fichiers d'analyse fastqc vers le repertoire qualite
-	cp $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
+	# copie des fichiers d'analyse fastqc vers le repertoire qualite version 3.1 Simplification cp 
+	cp $REPERTORY/$name/*$html $QUALITY/$name/
 	# Suppression des fichiers brutes en attente fichier intermediaire
 	rm -dr $REPERTORY/$name/*fastqc.zip 
 	#Creation d'un fichier temporaire: Stockage Fichier SAM à BAM de préparation
@@ -509,7 +507,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "**********************************************************************\n" >> $PREPARATION_BAM_FILE
 	# Copie vers le répertoire qualité
 	# Mise en commentaire car le code R ne génère pas fichier pour quelques patients
-	#VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
+	VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
 	cp $(pwd)/${name}_couverture_analyse.bed.html $QUALITY/$name/
 	# Si analyse du fichier qualité
 	if [ $qualite = "OK" ]
