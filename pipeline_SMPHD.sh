@@ -191,8 +191,8 @@ function DATABASE () {
 	# Dictionnaire annotation 
 	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.1.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Statistic_Database_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Dictionnary_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_statistic_dictionnary.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_Database_variant.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
