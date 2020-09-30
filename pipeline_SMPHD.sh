@@ -189,7 +189,7 @@ function DATABASE () {
 	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_27-07-20.csv
 	BASE_ARTEFACT=$ANNOTATION_REP/Artefact/Base_artefact_120220.csv
 	# Dictionnaire annotation 
-	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_28_09_20.json
+	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.1.json
 	# Exit Database Result
 	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Statistic_Database_dictionnary.csv
 	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Dictionnary_Database_variant.json
