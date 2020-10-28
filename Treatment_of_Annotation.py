@@ -281,8 +281,10 @@ def filter_annotation_dico(annotation,out,method):
 	remove = []
 	i = 0
 	name_VAF = "VAF"
-	# Filtre des VAF <2% sont eliminées
-	Filter_VAF = 0.02
+	# Filtre des VAF <0.5% sont eliminées
+	Filter_VAF = 0.005
+	Filter_VAF_TP53 = 0.001
+	
 	
 	# Filter
 	# Pour le dictionnaire ne pas enlever les polymorphismes
@@ -298,26 +300,32 @@ def filter_annotation_dico(annotation,out,method):
 
 
 		# Partie AF
-		elif annotation.loc[i,name_VAF] < Filter_VAF  and method != "Pindel":
+		# Treshold 0.5%
+		elif annotation.loc[i,name_VAF] < Filter_VAF  and method != "Pindel" and annotation.loc[i,"Gene.refGene"] != "TP53":
 			remove.append(i)
-		
+		# Particularité 0.1 to 0.5%
+		elif annotation.loc[i,name_VAF] < Filter_VAF and annotation.loc[i,name_VAF] > Filter_VAF_TP53 and method != "Pindel" and annotation.loc[i,"Gene.refGene"] == "TP53"
+			annotation.loc[i,"FILTER"]="TP53"
+		# Treshold 0.1%
+		elif annotation.loc[i,name_VAF] < Filter_VAF and annotation.loc[i,name_VAF] > Filter_VAF_TP53 and method != "Pindel" and annotation.loc[i,"Gene.refGene"] == "TP53"
+			remove.append(i)
 		elif method == "Pindel":
 			# Cas chr13:FLT3
 			# premier filtre sur le type
 			if annotation.loc[i,"Gene.refGene"] == "FLT3" and annotation.loc[i,"SVTYPE"] not in FLT3_type:
 				remove.append(i)
 			# Deuxieme filtre sur lA VAF
-			if annotation.loc[i,"Gene.refGene"] == "FLT3"and annotation.loc[i,name_VAF] < 0.01:
+			if annotation.loc[i,"Gene.refGene"] == "FLT3" and annotation.loc[i,name_VAF] < Filter_VAF_TP53:
 				remove.append(i)
 			# Cas chr19 CALR
 			# premier filtre sur le type
 			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,"SVTYPE"] not in CALR_type:
 				remove.append(i)	
 			# Deuxieme filtre sur lA VAF
-			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF:
+			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF_TP53:
 				remove.append(i)
 			# Passge du filtre
-			else:	
+			else:
 				annotation.loc[i,"FILTER"]="PASS"
 
 

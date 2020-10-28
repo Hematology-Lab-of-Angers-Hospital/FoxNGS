@@ -180,7 +180,7 @@ def statistic(dico_database,out):
 			if cle.startswith("chr") == True:
 				tmp = cle
 				# Afficher l'information sur un variant
-				#if cle == "chr17_74732935_CGGCGGCTGTGGTGTGAGTCCGGGG_C":
+				#if cle == "chr11_118373179_G_A":
 				#	print(dico_database[cle])
 				
 				# Si la cle n'est pas vide
@@ -293,4 +293,4 @@ if __name__ == '__main__':
 	
 	
 	sys.exit(0)
-#python3 /home/t-chu-027/Bureau/Recherche/Pipeline/SMPHD_v2.8/database_dictionnary_v2.8.py -o /media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_Database_variant.json -s True -outstat /media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_Database_variant.csv
+#python3 /home/t-chu-027/Bureau/Recherche/Pipeline/SMPHD_Routine/database_dictionnary.py -o /media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Dictionnary_Database_variant.json -s True -outstat /media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Statistic_Database_dictionnary.csv
