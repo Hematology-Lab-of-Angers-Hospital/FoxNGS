@@ -30,7 +30,7 @@ name = paste(params$directory, params$file, sep = '/')
 bed = read.table(name) 
 patient = unlist(strsplit(params$file,"_"))[1]
 ```
-## Le fichier analysé est `r name` pour le patient `r patient`. L'utilisateur `r params$user` a lancé le pipeline de routine `r params$pipeline`.
+## Le fichier analysé est `r name` pour le patient `r patient`. L'utilisateur `r params$user` a lancé le pipeline de routine `r params$pipeline` avec la version 3.0.
 
 
 # Couverture du design
