@@ -3,10 +3,10 @@
 # Bioinformatique
 # Laboratoire d'hématologie
 # Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
-# Dernière Modification: 21/09/20
+# Dernière Modification: 18/12/20
 # But :
-# Mise à jour cosmic, % target
-# suppresiob variable site qui ne sont plus utilisé (exac, 1000G gardé en achivvage)
+#  % target dans fichier csv
+
 echo "#############################################################"
 echo "#-----------------------------------------------------------#"
 echo "#-                                                         -#"
@@ -191,8 +191,8 @@ function DATABASE () {
 	# Dictionnaire annotation 
 	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.1.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_statistic_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.1_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.2_statistic_dictionnary.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.2_Database_variant.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
@@ -390,7 +390,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# *************************************************
 	# Génération du fichier qualité
 	echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
-	fastqc -o . $R1 $R2 -t 16
+	#fastqc -o . $R1 $R2 -t 16
 	# Extension
 	html="_fastqc.html"
 	# copie des fichiers d'analyse fastqc vers le repertoire qualite version 3.1 Simplification cp 
@@ -409,19 +409,19 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Construction du fichier SAM via BAW-MEM" >>$PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE  
 	echo -e "bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam" >> $PREPARATION_BAM_FILE
-	bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
+	#bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
 	echo -e "Alignement effectué" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE 
 
 	# Génération du fichier bam
 	echo -e "Génération du fichier bam:\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam" >> $PREPARATION_BAM_FILE
-	samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
+	#samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
 	# Tri du fichier
 	echo -e "samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
-	samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
+	#samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
 	echo -e "samtools index -@ 16 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 16 -b tmp/${name}.sort.bam
+	#samtools index -@ 16 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
 	# Total of read
@@ -449,17 +449,32 @@ function LANCEMENT_QUALITY_BAM () {
 	# avec les région intronique aussi  pour déceler les mutations de type épissage en plus
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
+
+	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v  > tmp/${name}-off-target.bam" >> $PREPARATION_BAM_FILE
+	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v > tmp/${name}-off-target.bam
+
+	samtools index -@ 16 -b tmp/${name}.sort_mapped.bam
+	# Verification off target
+	totalmapnointersect=$(samtools view -h -@ 16 -c tmp/${name}-off-target.bam )
+	echo -e "*******************************" >> $PREPARATION_BAM_FILE
+	echo -e "Total of read mapped in panel gene: $totalmapnointersect" >> $PREPARATION_BAM_FILE
+
 	# Mapped and intersected in region
 	totalmapintersect=$(samtools view -h -@ 16 -c tmp/${name}-on-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
-	# Calcul du ratio 
+	# Calcul du ratio on target
 	ratio=$(echo "($totalmapintersect/$mapped)*100" | bc -l )
+	# Calcul du ratio off target
+	ratio_of=$(echo "($totalmapnointersect/$mapped)*100" | bc -l )
 	# Conversion float to int to comparison
 	int_ratio=${ratio%.*}
+	int_ratio_off=${ratio_off%.*}
 	echo -e "Ratio of read mapped in panel gene: $int_ratio" >> $PREPARATION_BAM_FILE
+	echo -e "Ratio of read mapped out panel gene: $int_ratio_off" >> $PREPARATION_BAM_FILE
 	limite_ratio=60 
 	echo -e "Seuil ratio of read mapped in panel gene: $limite_ratio" >> $PREPARATION_BAM_FILE
+
 	# Condition
 	# Librairie non correcte
 	if [ "$int_ratio" -lt "$limite_ratio" ] 
@@ -521,10 +536,10 @@ function LANCEMENT_QUALITY_BAM () {
 
 	# Suppresion des fichiers tmp
 	# Suppression du fichier temporaire .sam, du bam ininial et du bam sort_mapped et du bam target
-	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*on-target.bam* tmp/*2048* 
+	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*2048* 
 	
 	# Copie des fichiers BAM
-	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai $QUALITY/$name/
+	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*on-target.bam* tmp/*off-target.bam* tmp/*sort.bam* $QUALITY/$name/
 	
 }
 

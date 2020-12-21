@@ -2,11 +2,11 @@
 # *********************
 #  Pipeline bioinformatique SMPHD                 
 #	Données NGS                   
-#   Version 3.1, version stable
+#   Version 3.2, version essai
 # *********************
 
 # Tutoriel
-Code principale pipeline_SMPHD_V3.0.sh
+Code principale pipeline_SMPHD.sh
 appel des codes python
 
 # Versioning tools
@@ -18,7 +18,7 @@ appel des codes python
 - GATK Haplotype caller et Mutect 4.1.5
 - Pindel
 ## Annotation
-- Cosmic 89 et Cosmic 91
+- Cosmic 89 et Cosmic 92s
 - cytoBand
 - gnomad211_exome
 - clinvar_20200316

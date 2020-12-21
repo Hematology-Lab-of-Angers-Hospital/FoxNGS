@@ -32,7 +32,7 @@ name = paste(params$directory, params$file, sep = '/')
 bed = read.table(name) 
 patient = unlist(strsplit(params$file,"_"))[1]
 ```
-## Le fichier analysé est `r name` pour le patient `r patient`. L'utilisateur `r params$user` a lancé le pipeline de routine `r params$pipeline`.
+## Le fichier analysé est `r name` pour le patient `r patient`. L'utilisateur `r params$user` a lancé le pipeline de routine `r params$pipeline` verstion test 3.2.
 
 
 # Couverture du design
@@ -66,8 +66,8 @@ X50b=round((X50/Nbase)*100,2)
 X100b=round((X100/Nbase)*100,2)
 X200b=round((X200/Nbase)*100,2)
 # Ecriture statique commune
-#write(paste("Patient","Couv >200x","Mediane",sep=";"), params$output,append=TRUE)
-write(paste(patient,X200b,median,sep=";"), params$output,append=TRUE)
+#write(paste("Patient","Couv >200x","Mediane","%in-target",sep=";"), params$output,append=TRUE)
+write(paste(patient,X200b,median,params$ratio_library,sep=";"), params$output,append=TRUE)
 
 
 # Categorisation par profondeur de couverture
