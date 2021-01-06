@@ -454,6 +454,7 @@ function LANCEMENT_QUALITY_BAM () {
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v > tmp/${name}-off-target.bam
 
 	samtools index -@ 16 -b tmp/${name}.sort_mapped.bam
+	samtools index -@ 16 -b tmp/${name}-off-target.bam
 	# Verification off target
 	totalmapnointersect=$(samtools view -h -@ 16 -c tmp/${name}-off-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -466,7 +467,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# Calcul du ratio on target
 	ratio=$(echo "($totalmapintersect/$mapped)*100" | bc -l )
 	# Calcul du ratio off target
-	ratio_of=$(echo "($totalmapnointersect/$mapped)*100" | bc -l )
+	ratio_off=$(echo "($totalmapnointersect/$mapped)*100" | bc -l )
 	# Conversion float to int to comparison
 	int_ratio=${ratio%.*}
 	int_ratio_off=${ratio_off%.*}
