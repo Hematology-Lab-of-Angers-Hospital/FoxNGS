@@ -1,17 +1,20 @@
 #!/bin/bash
-# Creation of new database of annotation for pipeline_SMPHD_v2.7.sh
-# Note all commande for creation of database for pipeline_SMPHD_v2.6.sh in annovar.sh dans Archive
-# Faire pareil pour toutes les databases
-# Date 03/07/20
+# Ajout nouveau module au pipeline
+# Date 07/01/21
 
 # ~/Bureau/Recherche/Pipeline/./database_annotation.sh
 # Header
 ANNOVAR=~/BioNGSTools/annovar
-PATH=/media/t-chu-027/DATAPART1/Database
+PATH=/media/t-chu-027/DATAPART2/Database
 cd $PATH
 
 # Download Database
 echo $ANNOVAR
+
+# Ajout annotation
+perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar avsnp138 humandb_annovar/
+perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar dbnsfp41a humandb_annovar/
+perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar snp138 humandb_annovar/
 # Rappel Commande Annotations
 #$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic90,gnomad211_exome,clinvar_20190305,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
 	
