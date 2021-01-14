@@ -12,7 +12,10 @@ cd $PATH
 echo $ANNOVAR
 
 # Ajout annotation
+# version 138
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar avsnp138 humandb_annovar/
+# Version 150
+perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar avsnp150 humandb_annovar/
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar dbnsfp41a humandb_annovar/
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar snp138 humandb_annovar/
 # Rappel Commande Annotations
