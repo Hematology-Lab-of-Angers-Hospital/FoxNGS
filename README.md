@@ -18,6 +18,7 @@ appel des codes python
 - GATK Haplotype caller et Mutect 4.1.5
 - Pindel
 ## Annotation
+- ajout dbsnp
 - Cosmic 89 et Cosmic 92s
 - cytoBand
 - gnomad211_exome

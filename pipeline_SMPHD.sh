@@ -6,13 +6,14 @@
 # Dernière Modification: 18/12/20
 # But :
 #  % target dans fichier csv
+# A prevoir: Test pour les annotations dbsnp et amélioration dbsnfp41a
 
 echo "#############################################################"
 echo "#-----------------------------------------------------------#"
 echo "#-                                                         -#"
 echo "#-                 Pipeline bioinformatique SMPHD          -#"
 echo "#-                   Données SURESELECQTX                  -#"
-echo "#-                       Version 3.2                       -#"
+echo "#-                       Version 3.3                       -#"
 echo "#-                                                         -#"
 echo "#-----------------------------------------------------------#"
 echo "#############################################################"
@@ -28,9 +29,9 @@ function HELP {
 	echo -e "Lancement du pipeline HD"
 	echo -e "./pipeline_SMPHD.sh"
 	echo -e "Un menu demandera les paramètres à rentrer"
-	echo -e "Version 3.2"
+	echo -e "Version 3.3"
 	echo -e "Cette nouvelle version contient la création d'un dictionnaire"
-	echo -e "La mise à jour de Cosmic 91 à la place de Cosmic 90 et de clinvar"
+	echo -e "Les test de cosmic 92, dbSNP138 et dbnsfp41a"
 	echo -e " Si une modification de database ou d'appel de software a été modifié."
 	echo -e "Il est nécessaire de créer un autre dictionnaire"
 	echo -e "Question qualité:"
@@ -79,8 +80,8 @@ function CREATION_RECHERCHE_FILE () {
 	DESIGN=$REPERTORY/Experimental_Design
 	# Localisation file
 	# Exit report
-	QUALITY=/media/t-chu-027/Elements/Result_NGS/$NAME_RUN
-	COUV=/media/t-chu-027/Elements/Result_NGS/$NAME_RUN
+	QUALITY=/media/t-chu-027/Elements/Result_NGS/TEST_PIPELINE/$NAME_RUN
+	COUV=/media/t-chu-027/Elements/Result_NGS/TEST_PIPELINE/$NAME_RUN
 	mkdir $QUALITY
 	mkdir $COUV
 	# Recherche automatique des fichiers brutes
@@ -191,8 +192,8 @@ function DATABASE () {
 	# Dictionnaire annotation 
 	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.1.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.2_statistic_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_Test3.2_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Test_pipeline/Project_Test3.3_statistic_dictionnary.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Test_pipeline/Project_Test3.3_Database_variant.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
@@ -721,8 +722,8 @@ function Annovar (){
 	
 	# Annotation 
 	date >> $ANNOTATION_FILE
-	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
-	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
+	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
+	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
 	date >> $ANNOTATION_FILE
 	# VCT to CSV
 	VCFToTable $name $method
@@ -883,8 +884,8 @@ function LANCEMENT_ANALYSE_PATIENT () {
 	elif [ "$ANALYSE" = "Annotation" ] || [ "$ANALYSE" = "All" ] ; then
 		# Statistic one time in dictionnary
 		echo -e "python3 $DICTIONNARY -o ${DICT} -s True -outstat ${STAT_DICT}" 
-		python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
-		VERIFY_FILE $STAT_DICT
+		#python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
+		#VERIFY_FILE $STAT_DICT
 	else
 		echo "Aucune preanalyse a effectué pour : $ANALYSE" >> $LOG
 	fi
