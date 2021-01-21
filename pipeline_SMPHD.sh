@@ -157,7 +157,6 @@ function DATABASE () {
 	# Analyse qualité - Script R
 	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_Routine/R_Quality_SMPHD.Rmd
 	# Caller
-
 	VARSCAN=~/BioNGSTools/varscan/VarScan.v2.4.3.jar
 	# Somatic Variant
 	GATK=~/BioNGSTools/gatk-4.1.5.0/gatk-package-4.1.5.0-local.jar
@@ -172,11 +171,14 @@ function DATABASE () {
 	EXIST_FILE=~/Bureau/Recherche/Script/exist_file.sh
 	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_Routine/database_dictionnary.py
 	# ********************************************
+	# Essai samtools 1.10
+	SAMTOOLS_1_10=/home/t-chu-027/BioNGSTools/samtools-1.10/./samtools
+	# ********************************************
 	# Database 
 	# Fichier
-	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v5.sorted.bed
+	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7_UBA1_RUNX1_EXON9.sorted.bed
 	# Bed pour couverture et l'analyse qualité R
-	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel.bed
+	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel_v7.bed
 	# Variant
 	# Fichier Bed Pindel Ajout de NPM1
 	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15.bed
@@ -391,7 +393,7 @@ function LANCEMENT_QUALITY_BAM () {
 	# *************************************************
 	# Génération du fichier qualité
 	echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
-	#fastqc -o . $R1 $R2 -t 16
+	fastqc -o . $R1 $R2 -t 16
 	# Extension
 	html="_fastqc.html"
 	# copie des fichiers d'analyse fastqc vers le repertoire qualite version 3.1 Simplification cp 
@@ -410,19 +412,19 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Construction du fichier SAM via BAW-MEM" >>$PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE  
 	echo -e "bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam" >> $PREPARATION_BAM_FILE
-	#bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
+	bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
 	echo -e "Alignement effectué" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE 
 
 	# Génération du fichier bam
 	echo -e "Génération du fichier bam:\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam" >> $PREPARATION_BAM_FILE
-	#samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
+	samtools view -@ 16 -Sh tmp/${name}.sam -bo tmp/${name}.bam
 	# Tri du fichier
 	echo -e "samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam">> $PREPARATION_BAM_FILE
-	#samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
+	samtools sort -@ 16 tmp/${name}.bam -o tmp/${name}.sort.bam >> $PREPARATION_BAM_FILE
 	echo -e "samtools index -@ 16 -b tmp/${name}.sort.bam" >> $PREPARATION_BAM_FILE
-	#samtools index -@ 16 -b tmp/${name}.sort.bam
+	samtools index -@ 16 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
 	# Total of read
@@ -446,16 +448,36 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Only chimeric : $chimeric" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE
+
+
+	# Analyse qualité coverage All read mapped
+	samtools index -@ 16 -b tmp/${name}.sort_mapped.bam
+	echo -e "$SAMTOOLS_1_10 coverage tmp/${name}.sort_mapped.bam -m > tmp/${name}.sort_mapped_analyse_coverage.bed" >> $PREPARATION_BAM_FILE
+	$SAMTOOLS_1_10 coverage tmp/${name}.sort_mapped.bam -m > tmp/${name}.sort_mapped_analyse_coverage.bed
+	
+
 	# Intersection avec le fichier du design 
 	# avec les région intronique aussi  pour déceler les mutations de type épissage en plus
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
 
+	# Analyse qualité coverage on target
+	echo -e "samtools index  -@ 16 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
+	samtools index -@ 16 -b tmp/${name}-on-target.bam
+	echo -e "$SAMTOOLS_1_10 coverage tmp/${name}-on-target.bam -m > tmp/${name}-on-target_analyse_coverage.bed" >> $PREPARATION_BAM_FILE
+	$SAMTOOLS_1_10 coverage tmp/${name}-on-target.bam -m > tmp/${name}-on-target_analyse_coverage.bed
+
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v  > tmp/${name}-off-target.bam" >> $PREPARATION_BAM_FILE
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v > tmp/${name}-off-target.bam
 
-	samtools index -@ 16 -b tmp/${name}.sort_mapped.bam
+	# Analyse qualité coverage on target
+	echo -e "samtools index  -@ 16 -b tmp/${name}-off-target.bam" >> $PREPARATION_BAM_FILE
 	samtools index -@ 16 -b tmp/${name}-off-target.bam
+	echo -e "$SAMTOOLS_1_10 coverage tmp/${name}-off-target.bam -m > tmp/${name}-off-target_analyse_coverage.bed" >> $PREPARATION_BAM_FILE
+	$SAMTOOLS_1_10 coverage tmp/${name}-off-target.bam -m > tmp/${name}-off-target_analyse_coverage.bed
+
+	
+	
 	# Verification off target
 	totalmapnointersect=$(samtools view -h -@ 16 -c tmp/${name}-off-target.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
@@ -494,8 +516,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "samtools flagstat -@ 16 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat" >> $PREPARATION_BAM_FILE
 	samtools flagstat -@ 16 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat 		
 	echo -e "Reindexation" >> $PREPARATION_BAM_FILE
-	echo -e "samtools index  -@ 16 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 16 -b tmp/${name}-on-target.bam
+	
 
 	# Marquages des duplicates sans les enlever
 	echo -e "Marquage des duplicates" >> $PREPARATION_BAM_FILE
@@ -541,7 +562,7 @@ function LANCEMENT_QUALITY_BAM () {
 	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*2048* 
 	
 	# Copie des fichiers BAM
-	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*on-target.bam* tmp/*off-target.bam* tmp/*sort.bam* $QUALITY/$name/
+	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*on-target.bam* tmp/*off-target.bam* tmp/*sort.bam* tmp/*qqanalyse_coverage.bed $QUALITY/$name/
 	
 }
 
@@ -722,8 +743,8 @@ function Annovar (){
 	
 	# Annotation 
 	date >> $ANNOTATION_FILE
-	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
-	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
+	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
+	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
 	date >> $ANNOTATION_FILE
 	# VCT to CSV
 	VCFToTable $name $method
@@ -752,7 +773,6 @@ function LANCEMENT_ANNOTATION () {
 	# **************************	
 
 	NAME_REP_ANNOVAR=Annotation_Annovar
-	echo $NAME_REP_ANNOVAR
 	mkdir $NAME_REP_ANNOVAR
 	# GATK
 	# ****************
