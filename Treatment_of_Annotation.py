@@ -59,12 +59,12 @@ def preparation_file(file,output,method):
 		while i <= data.shape[0] -1 :
 			pass
 			# colonne ID
-			data.loc[i,"ID"] = data.loc[i,'CHROM']+ "_" + str(data.loc[i,'POS']) + "_" + str(data.loc[i,'REF']) + "_" + str(data.loc[i,'ALT'])
+			data.loc[i,"ID"] = str(data.loc[i,'CHROM'])+ "_" + str(data.loc[i,'POS']) + "_" + str(data.loc[i,'REF']) + "_" + str(data.loc[i,'ALT'])
 			# colonne method
 			
 			data.loc[i,name_Method_variant] = method
 			#Colonne IGV 
-			data.loc[i,"IGV"] = data.loc[i,'CHROM']+ ":" + str(data.loc[i,'POS'])
+			data.loc[i,"IGV"] = str(data.loc[i,'CHROM'])+ ":" + str(data.loc[i,'POS'])
 
 			# Cosmic annotation
 			# Cosmic 90
