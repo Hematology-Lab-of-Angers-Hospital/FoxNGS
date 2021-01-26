@@ -12,6 +12,7 @@ appel des codes python
 # Versioning tools
 ## Tools
 - samtools 1.9
+- samtools 1.10 en soutien non rendu
 - bwa mem  
 ## Call variant
 - Varscan 2.4.3
@@ -19,7 +20,7 @@ appel des codes python
 - Pindel
 ## Annotation
 - ajout dbsnp
-- Cosmic 89 et Cosmic 92s
+- Cosmic 89 et Cosmic 92
 - cytoBand
 - gnomad211_exome
 - clinvar_20200316
@@ -36,3 +37,9 @@ appel des codes python
 - Affichage du % of target dans R
 # 3.1
 - NPM1
+## 3.3
+- Analyse of target
+- Inclusion de cosmic 92 à la place de cosmic 91
+- Ajout de dbsnp138
+- Affichage du % of target dans R
+- Ajout dans le fichier csv

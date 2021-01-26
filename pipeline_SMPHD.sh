@@ -3,7 +3,7 @@
 # Bioinformatique
 # Laboratoire d'hématologie
 # Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
-# Dernière Modification: 18/12/20
+# Dernière Modification: 26/01/21
 # But :
 #  % target dans fichier csv
 # A prevoir: Test pour les annotations dbsnp et amélioration dbsnfp41a
@@ -31,7 +31,7 @@ function HELP {
 	echo -e "Un menu demandera les paramètres à rentrer"
 	echo -e "Version 3.3"
 	echo -e "Cette nouvelle version contient la création d'un dictionnaire"
-	echo -e "Les test de cosmic 92, dbSNP138 et dbnsfp41a"
+	echo -e "Remplacement de cosmic 92, dbSNP138  at ajout qualite"
 	echo -e " Si une modification de database ou d'appel de software a été modifié."
 	echo -e "Il est nécessaire de créer un autre dictionnaire"
 	echo -e "Question qualité:"
@@ -176,7 +176,7 @@ function DATABASE () {
 	# ********************************************
 	# Database 
 	# Fichier
-	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7_UBA1_RUNX1_EXON9.sorted.bed
+	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7.bed
 	# Bed pour couverture et l'analyse qualité R
 	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel_v7.bed
 	# Variant
@@ -189,10 +189,10 @@ function DATABASE () {
 	ANNOVAR_DB=/media/t-chu-027/DATAPART2/Database/humandb_annovar
 
 	ANNOTATION_REP=/media/t-chu-027/DATAPART2/Database/Annotation
-	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_27-07-20.csv
+	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_26_01_21.csv
 	BASE_ARTEFACT=$ANNOTATION_REP/Artefact/Base_artefact_120220.csv
 	# Dictionnaire annotation 
-	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.1.json
+	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.3.json
 	# Exit Database Result
 	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Test_pipeline/Project_Test3.3_statistic_dictionnary.csv
 	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Test_pipeline/Project_Test3.3_Database_variant.json
@@ -412,7 +412,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Construction du fichier SAM via BAW-MEM" >>$PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE  
 	echo -e "bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam" >> $PREPARATION_BAM_FILE
-	bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
+	bwa mem -t 16 -R "@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}" $BWA_REF $R1 $R2 -o tmp/${name}.sam 
 	echo -e "Alignement effectué" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE 
 
@@ -562,7 +562,7 @@ function LANCEMENT_QUALITY_BAM () {
 	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*2048* 
 	
 	# Copie des fichiers BAM
-	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*on-target.bam* tmp/*off-target.bam* tmp/*sort.bam* tmp/*qqanalyse_coverage.bed $QUALITY/$name/
+	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*on-target.bam* tmp/*off-target.bam* tmp/*sort.bam* tmp/*analyse_coverage.bed $QUALITY/$name/
 	
 }
 
@@ -904,8 +904,8 @@ function LANCEMENT_ANALYSE_PATIENT () {
 	elif [ "$ANALYSE" = "Annotation" ] || [ "$ANALYSE" = "All" ] ; then
 		# Statistic one time in dictionnary
 		echo -e "python3 $DICTIONNARY -o ${DICT} -s True -outstat ${STAT_DICT}" 
-		#python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
-		#VERIFY_FILE $STAT_DICT
+		python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
+		VERIFY_FILE $STAT_DICT
 	else
 		echo "Aucune preanalyse a effectué pour : $ANALYSE" >> $LOG
 	fi

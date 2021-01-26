@@ -57,6 +57,10 @@ def preparation_file(file,output,method):
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=r"x3d", value="", regex=True)
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=r"\\", value="", regex=True)
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=":", value="", regex=True)
+	int_name_patient = file.split("_")[2]
+	name_patient = int_name_patient.split(".")[0]
+	print("nom_patient : " name_patient)
+
 	name_VAF= "VAF"
 
 	i=0
@@ -64,12 +68,12 @@ def preparation_file(file,output,method):
 		while i <= data.shape[0] -1 :
 			pass
 			# colonne ID
-			data.loc[i,"ID"] = data.loc[i,'CHROM']+ "_" + str(data.loc[i,'POS']) + "_" + str(data.loc[i,'REF']) + "_" + str(data.loc[i,'ALT'])
+			data.loc[i,"ID"] = str(data.loc[i,'CHROM']) + "_" + str(data.loc[i,'POS']) + "_" + str(data.loc[i,'REF']) + "_" + str(data.loc[i,'ALT'])
 			# colonne method
 			
 			data.loc[i,name_Method_variant] = method
 			#Colonne IGV 
-			data.loc[i,"IGV"] = data.loc[i,'CHROM']+ ":" + str(data.loc[i,'POS'])
+			data.loc[i,"IGV"] = str(data.loc[i,'CHROM'])+ ":" + str(data.loc[i,'POS'])
 
 			# Cosmic annotation
 			# Cosmic 92
@@ -129,11 +133,11 @@ def preparation_file(file,output,method):
 			# Calcul VAF
 			if method == "GATK" or method == "Mutect2":
 				
-				ALT = data.loc[i,"C5-${name}:AD"].split(',')[1]
-				REF = data.loc[i,"C5-${name}:AD"].split(',')[0]
+				ALT = data.loc[i,"C5-" + name_patient + ":AD"].split(',')[1]
+				REF = data.loc[i,"C5-" + name_patient + ":AD"].split(',')[0]
 				data.loc[i,"GATK_ALT"] = float(ALT)
 				data.loc[i,"GATK_REF"] = float(REF)
-				data.loc[i,name_VAF] = round(float(data.loc[i,"GATK_ALT"])/data.loc[i,"C5-${name}:DP"],4)
+				data.loc[i,name_VAF] = round(float(data.loc[i,"GATK_ALT"])/data.loc[i,"C5-" + nom_patient + ":DP"],4)
 					
 			elif method == "Varscan":
 				
@@ -182,10 +186,10 @@ def preparation_file(file,output,method):
 	name = 'ALL_VAF_' + output
 	# Write file
 	data.to_csv(name, sep = ';')
-	return(data)
+	return(data,nom_patient)
 
 # Function Delete columns and clean table First filter to suppress column
-def action_column(data,method):
+def action_column(data,method,name_patient):
 	"""
 		Input : Table annotation with column redundance and reorder column
 		Output: Table annotation without column redundance and reorder column
@@ -198,18 +202,18 @@ def action_column(data,method):
 	name_VAF = "VAF"
 	# ,'DS'
 	if method == "GATK":
-		data.rename(columns={'C5-${name}:DP': name_DP}, inplace=True)
+		data.rename(columns={'C5-' + name_patient + ':DP': name_DP}, inplace=True)
 		info_delete=['AC','AF','AN','BaseQRankSum','ExcessHet','FS','InbreedingCoeff',
-					'MLEAC','MLEAF','MQRankSum','QD','ReadPosRankSum','SOR','C5-${name}:AD',
-					'C5-${name}:PL','GATK_REF','GATK_ALT','DP','C5-${name}:GT','QUAL','MQ','C5-${name}:GQ']
+					'MLEAC','MLEAF','MQRankSum','QD','ReadPosRankSum','SOR','C5-' + name_patient + ':AD',
+					'C5-' + name_patient + ':PL','GATK_REF','GATK_ALT','DP','C5-' + name_patient + ':GT','QUAL','MQ','C5-' + name_patient + ':GQ']
 		
 	elif method == "Mutect2":
 		
-		data = data.rename(columns={'C5-${name}:DP':name_DP})
+		data = data.rename(columns={'C5-' + name_patient + ':DP':name_DP})
 		info_delete=['QUAL','ECNT','MBQ','MFRL','MMQ','MPOS','NCount','PON','POPAF','RPA','RU',
 					'SEQQ','STR','STRANDQ','STRQ','TLOD','UNIQ_ALT_READ_COUNT','CONTQ','GERMQ','NALOD'
-					,'NLOD','OCM','ROQ','C5-${name}:PID','C5-${name}:PL','C5-${name}:AD','C5-${name}:GT',
-					'GATK_REF','GATK_ALT','DP','C5-${name}:AF','C5-${name}:F1R2','C5-${name}:F2R1','C5-${name}:GQ','C5-${name}:PGT','C5-${name}:PS','C5-${name}:SB','AF']
+					,'NLOD','OCM','ROQ','C5-' + name_patient + ':PID','C5-' + name_patient + ':PL','C5-' + name_patient + ':AD','C5-' + name_patient + ':GT',
+					'GATK_REF','GATK_ALT','DP','C5-' + name_patient + ':AF','C5-' + name_patient + ':F1R2','C5-' + name_patient + ':F2R1','C5-' + name_patient + ':GQ','C5-' + name_patient + ':PGT','C5-' + name_patient + ':PS','C5-' + name_patient + ':SB','AF']
 		
 
 	elif method == "Varscan":
@@ -284,7 +288,7 @@ def action_column(data,method):
 	return reindex_data
 
 # Réalisation des filtres simples sur les variants avant l'entrée dans le dictionnaire
-def filter_annotation_dico(annotation,out,method):
+def filter_annotation_dico(annotation,out,method,patient_nom):
 	"""
 		Input: Fichier combiné
 		Output: Fichier Filtré sur les variants d'interet 
@@ -382,7 +386,7 @@ def filter_annotation_dico(annotation,out,method):
 	# Creation du nouvelle index ID 
 	annotation.set_index('ID',inplace=True)
 	# Call function Clean columns
-	annotation_filter = action_column(annotation,method)
+	annotation_filter = action_column(annotation,method,patient_nom)
 	# enregistrement 
 	filter_out ='Filter_' + out
 	annotation_filter.to_csv(filter_out, sep = ';')
@@ -610,7 +614,8 @@ def final_statistic_database (name_patient,file_database,dico_annotation,out):
 	#reindexation des colonnes
 	file_patient_reorder = file_patient_popmax.reindex(columns =reorder)
 	# Write of file
-	file_patient_reorder.to_csv(out, sep = ';')
+	file_patient_reorder.to_csv(out)
+	file_patient_reorder.to_excel(out.split(".")[0] + ".xlsx", sheet_name = file_patient_reorder["PATIENT_ID"].unique()[0])
 
 # Creation de la colonne FreqDatabase
 def freq_database(file_patient,file_database):
@@ -861,9 +866,9 @@ if __name__ == '__main__':
 	# Preparation annotation file by method
 	if args.method in Variant_calling:
 		# Preparation du fichier d'annotation et calcul du VAF
-		data_annotation = preparation_file(args.file,args.out,args.method)
+		data_annotation,nom_patient = preparation_file(args.file,args.out,args.method)
 		# Réalisation des filtres simple 
-		filter_annotation_dico(data_annotation,args.out,args.method)
+		filter_annotation_dico(data_annotation,args.out,args.method,nom_patient)
 	#  Combination of file
 	elif args.method == "All":
 
