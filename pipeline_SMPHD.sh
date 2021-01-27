@@ -743,8 +743,8 @@ function Annovar (){
 	
 	# Annotation 
 	date >> $ANNOTATION_FILE
-	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
-	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic91,cosmic89,snp138,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp41a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
+	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
+	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
 	date >> $ANNOTATION_FILE
 	# VCT to CSV
 	VCFToTable $name $method
@@ -805,8 +805,8 @@ function LANCEMENT_ANNOTATION () {
 	# ***************
 	# All fusion annotation
 	# Annotation simple
-	echo -e "python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name} -i ${DICT_ANNOTATION} -m All" >> $ANNOTATION_FILE
-	python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name}  -i $DICT_ANNOTATION -m All
+	echo -e "python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name} -i ${DICT_ANNOTATION}  -r ${NAME_RUN} -m All" >> $ANNOTATION_FILE
+	python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name}  -i $DICT_ANNOTATION -r ${NAME_RUN} -m All
 
 	# ***************
 	# Insert Dictionnary
