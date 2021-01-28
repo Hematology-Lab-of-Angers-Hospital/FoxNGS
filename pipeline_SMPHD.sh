@@ -3,9 +3,9 @@
 # Bioinformatique
 # Laboratoire d'hématologie
 # Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
+# ajout du gène UBA1
 # Dernière Modification: 26/01/21
-# But :
-#  % target dans fichier csv
+
 # A prevoir: Test pour les annotations dbsnp et amélioration dbsnfp41a
 
 echo "#############################################################"
@@ -13,7 +13,7 @@ echo "#-----------------------------------------------------------#"
 echo "#-                                                         -#"
 echo "#-                 Pipeline bioinformatique SMPHD          -#"
 echo "#-                   Données SURESELECQTX                  -#"
-echo "#-                       Version 3.3                       -#"
+echo "#-                       Version Routine / 3.3             -#"
 echo "#-                                                         -#"
 echo "#-----------------------------------------------------------#"
 echo "#############################################################"
@@ -29,7 +29,7 @@ function HELP {
 	echo -e "Lancement du pipeline HD"
 	echo -e "./pipeline_SMPHD.sh"
 	echo -e "Un menu demandera les paramètres à rentrer"
-	echo -e "Version 3.3"
+	echo -e "Version 3.3 / Routine"
 	echo -e "Cette nouvelle version contient la création d'un dictionnaire"
 	echo -e "Remplacement de cosmic 92, dbSNP138  at ajout qualite"
 	echo -e " Si une modification de database ou d'appel de software a été modifié."
@@ -74,14 +74,14 @@ function CREATION_RECHERCHE_FILE () {
 	REPERTORY=${RUN}/${SORTIE}
 	mkdir $REPERTORY 
 
-	LOG=$REPERTORY/log_pipeline_SMPHD_v3.1.txt
+	LOG=$REPERTORY/log_pipeline_SMPHD_Routine_v3.3.txt
 	WORKFLOW=$REPERTORY/Workfow.xml
 	CONFIGURATION=$REPERTORY/Configuration_file
 	DESIGN=$REPERTORY/Experimental_Design
 	# Localisation file
 	# Exit report
-	QUALITY=/media/t-chu-027/Elements/Result_NGS/TEST_PIPELINE/$NAME_RUN
-	COUV=/media/t-chu-027/Elements/Result_NGS/TEST_PIPELINE/$NAME_RUN
+	QUALITY=/media/t-chu-027/Elements/Result_NGS/$NAME_RUN
+	COUV=/media/t-chu-027/Elements/Result_NGS/$NAME_RUN
 	mkdir $QUALITY
 	mkdir $COUV
 	# Recherche automatique des fichiers brutes
@@ -192,10 +192,10 @@ function DATABASE () {
 	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_26_01_21.csv
 	BASE_ARTEFACT=$ANNOTATION_REP/Artefact/Base_artefact_120220.csv
 	# Dictionnaire annotation 
-	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_10_20_v3.3.json
+	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_26_01_21_v3.3.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Test_pipeline/Project_Test3.3_statistic_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Test_pipeline/Project_Test3.3_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Routine/Statistic_Database_dictionnary_routine_v3.3.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Routine/Dictionnary_Database_variant_routine_v3.3.json
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
@@ -354,7 +354,7 @@ function LANCEMENT_QUALITY_BAM () {
 	name=$1
 	
 	# Fichier log de sortie
-	PREPARATION_BAM_FILE=$REPERTORY/$name/log_bam_test_3.1.txt
+	PREPARATION_BAM_FILE=$REPERTORY/$name/log_bam_test_Routine.txt
 	
 	# Création d'un répertoire pour chaque patient
 	mkdir $REPERTORY/$name
@@ -562,7 +562,7 @@ function LANCEMENT_QUALITY_BAM () {
 	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*2048* 
 	
 	# Copie des fichiers BAM
-	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*on-target.bam* tmp/*off-target.bam* tmp/*sort.bam* tmp/*analyse_coverage.bed $QUALITY/$name/
+	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*analyse_coverage.bed $QUALITY/$name/
 	
 }
 
@@ -577,7 +577,7 @@ function LANCEMENT_VARIANT_CALLING () {
 	name=$1
 	mkdir $QUALITY/$name
 	# Fichier de sortie 
-	VARIANT_FILE=$REPERTORY/$name/logvariantcalling_3.1.txt
+	VARIANT_FILE=$REPERTORY/$name/logvariantcalling_Routine.txt
 	# function RAPPEL patient
 	echo -e "Lancement Variant_calling" >> $LOG
 	RAPPEL_PATIENT $name
@@ -764,7 +764,7 @@ function LANCEMENT_ANNOTATION () {
 	echo -e "Lancement Annotation" >> $LOG
 	RAPPEL_PATIENT $name
 	# Fichier de sortie
-	ANNOTATION_FILE=$REPERTORY/$name/log_annotation_3.1.txt
+	ANNOTATION_FILE=$REPERTORY/$name/log_annotation_Routine.txt
 	echo -e "************************************************\n" > $ANNOTATION_FILE
 	echo -e "Lancement annotation ANNOVAR:" >> $ANNOTATION_FILE
 	date >> $ANNOTATION_FILE
@@ -903,7 +903,7 @@ function LANCEMENT_ANALYSE_PATIENT () {
 	# Idée partir d'une même pour les patients lancés en même temps
 	elif [ "$ANALYSE" = "Annotation" ] || [ "$ANALYSE" = "All" ] ; then
 		# Statistic one time in dictionnary
-		echo -e "python3 $DICTIONNARY -o ${DICT} -s True -outstat ${STAT_DICT}" 
+		echo -e "python3 $DICTIONNARY -o ${DICT} -s True -outstat ${STAT_DICT}" >>$LOG 
 		python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
 		VERIFY_FILE $STAT_DICT
 	else

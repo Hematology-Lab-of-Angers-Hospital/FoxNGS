@@ -179,7 +179,7 @@ def action_column(data,method,name_patient):
 	"""
 	# ****************
 	# First suppresion column
-	commun_info=['Xref.refGene','GeneDetail.refGene','ALLELE_END','cosmic91','IARC']
+	commun_info=['Xref.refGene','GeneDetail.refGene','ALLELE_END','IARC','cosmic92','cosmic89']
 	data.drop(commun_info, axis='columns', inplace=True)
 	name_DP = "Total_DP" 
 	name_ALT = "Total_ALT"
@@ -227,6 +227,7 @@ def action_column(data,method,name_patient):
 	# ****************
 	#First Reorder column
 	cols = list(data.columns.values)
+	
 	reorder=[]
 	for c, value in enumerate(cols, 0):
 
@@ -234,6 +235,7 @@ def action_column(data,method,name_patient):
 		if value == "ANNOVAR_DATE":
 			reorder.append("Method_Variant")
 			reorder.append(name_DP)
+			reorder.append(name_ALT)
 			reorder.append(name_VAF)
 
 		# Si value = cytoband reinsertion des colonnes Occurences
@@ -451,7 +453,9 @@ def Fusion_file(data1,data2,data3,data4,all_file,output,name_run):
 	# Calcul Mean Alt
 	combine_file['Mean_ALT'] = combine_file[col_Alt].mean(skipna=True,axis=1)
 	
-	combine_file['Mean_DP'] = combine_file['Mean_DP'].round(3)
+	# Arrondi
+	combine_file['Mean_ALT'] = combine_file['Mean_ALT'].round(1)
+	combine_file['Mean_DP'] = combine_file['Mean_DP'].round(1)
 	combine_file['Mean_VAF'] = combine_file['Mean_VAF'].round(3)	
 	# call column transcript
 
@@ -606,7 +610,7 @@ def final_statistic_database (name_patient,file_database,dico_annotation,out):
 	#reindexation des colonnes
 	file_patient_reorder = file_patient_popmax.reindex(columns =reorder)
 	# Write of file
-	file_patient_reorder.to_csv(out)
+	file_patient_reorder.to_csv(out,sep=";")
 	file_patient_reorder.to_excel(out.split(".")[0] + ".xlsx", sheet_name = file_patient_reorder["PATIENT_ID"].unique()[0])
 
 # Creation de la colonne FreqDatabase
