@@ -3,17 +3,18 @@
 # Bioinformatique
 # Laboratoire d'hématologie
 # Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
-# Dernière Modification: 04/08/20
-# But :
-# Verification et notation de la prise en compte de NM 007313 à NM05157 de ABL1. 
-# Une réféencxe plus connue dans la littérature
-# suppresion variable site qui ne sont plus utilisé (exac, 1000G gardé en achivvage)
+# ajout du gène UBA1
+# Dernière Modification: 26/01/21
+
+# A prevoir: Test pour les annotations dbsnp et amélioration dbsnfp41a
+
+
 echo "#############################################################"
 echo "#-----------------------------------------------------------#"
 echo "#-                                                         -#"
 echo "#-                 Pipeline bioinformatique SMPHD          -#"
 echo "#-                   Données SURESELECQTX                  -#"
-echo "#-                       Version 3.0                       -#"
+echo "#-                       Version Routine / 3.3             -#"
 echo "#-                                                         -#"
 echo "#-----------------------------------------------------------#"
 echo "#############################################################"
@@ -29,9 +30,9 @@ function HELP {
 	echo -e "Lancement du pipeline HD"
 	echo -e "./pipeline_SMPHD.sh"
 	echo -e "Un menu demandera les paramètres à rentrer"
-	echo -e "Version 3.0"
+	echo -e "Version 3.3 / Routine"
 	echo -e "Cette nouvelle version contient la création d'un dictionnaire"
-	echo -e "La mise à jour de Cosmic 91 à la place de Cosmic 90 et de clinvar"
+	echo -e "Remplacement de cosmic 92, dbSNP138  at ajout qualite"
 	echo -e " Si une modification de database ou d'appel de software a été modifié."
 	echo -e "Il est nécessaire de créer un autre dictionnaire"
 	echo -e "Question qualité:"
@@ -74,7 +75,7 @@ function CREATION_RECHERCHE_FILE () {
 	REPERTORY=${RUN}/${SORTIE}
 	mkdir $REPERTORY 
 
-	LOG=$REPERTORY/log_pipeline_SMPHD_v3.0.txt
+	LOG=$REPERTORY/log_pipeline_SMPHD_Routine_v3.3.txt
 	WORKFLOW=$REPERTORY/Workfow.xml
 	CONFIGURATION=$REPERTORY/Configuration_file
 	DESIGN=$REPERTORY/Experimental_Design
@@ -157,7 +158,6 @@ function DATABASE () {
 	# Analyse qualité - Script R
 	RSCRIPT=~/Bureau/Recherche/Pipeline/SMPHD_Routine/R_Quality_SMPHD.Rmd
 	# Caller
-
 	VARSCAN=~/BioNGSTools/varscan/VarScan.v2.4.3.jar
 	# Somatic Variant
 	GATK=~/BioNGSTools/gatk-4.1.5.0/gatk-package-4.1.5.0-local.jar
@@ -172,13 +172,17 @@ function DATABASE () {
 	EXIST_FILE=~/Bureau/Recherche/Script/exist_file.sh
 	DICTIONNARY=~/Bureau/Recherche/Pipeline/SMPHD_Routine/database_dictionnary.py
 	# ********************************************
+	# Essai samtools 1.10
+	SAMTOOLS_1_10=/home/t-chu-027/BioNGSTools/samtools-1.10/./samtools
+
+	# ********************************************
 	# Database 
 	# Fichier
-	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v5.sorted.bed
+	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7.bed
 	# Bed pour couverture et l'analyse qualité R
-	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel.bed
+	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel_v7.bed
 	# Variant
-	# Fichier Bed Pindel
+	# Fichier Bed Pindel Ajout de NPM1
 	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15.bed
 	DBSNP=/media/t-chu-027/DATAPART2/Database/DB/dbsnp_138.hg19.vcf
 
@@ -187,14 +191,14 @@ function DATABASE () {
 	ANNOVAR_DB=/media/t-chu-027/DATAPART2/Database/humandb_annovar
 
 	ANNOTATION_REP=/media/t-chu-027/DATAPART2/Database/Annotation
-	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_27-07-20.csv
+	BASE_TRANSCRIT=$ANNOTATION_REP/Transcript_reference/Liste_genes_transcript_26_01_21.csv
 	BASE_ARTEFACT=$ANNOTATION_REP/Artefact/Base_artefact_120220.csv
 	# Dictionnaire annotation 
-	# Changement de nom 
-	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_27_07_20-v3.0.json
+	DICT_ANNOTATION=$ANNOTATION_REP/Database_annotation_26_01_21_v3.3.json
 	# Exit Database Result
-	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Statistic_Database_dictionnary.csv
-	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Dictionnary_Database_variant.json
+	STAT_DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Routine/Statistic_Database_dictionnary_routine_v3.3.csv
+	DICT=/media/t-chu-027/Elements/Result_NGS/Dictionnary_database_Routine/Dictionnary_Database_variant_routine_v3.3.json
+
 	# Methode d'appel de variant
 	METHODE1="GATK"
 	METHODE2="Mutect2"
@@ -230,7 +234,7 @@ function TEST_PARA () {
 # Menu 
 function INTERFACE () {
 	echo "****************************************************"
-	echo "Pipeline d'analyse des Données SURESELECT SMPHD version 3.0 "
+	echo "Pipeline d'analyse des Données SURESELECT SMPHD version 3.1 "
 	echo "****************************************************"
 	echo "Saisie des Données de lancement du RUN :"
 	echo "********"
@@ -323,7 +327,8 @@ function VERIFY_FILE () {
 	else
 		echo -e "Error File doesn't exist stop of analysis of patent"
 		exit 1
-fi
+	fi
+
 }
 
 # ******************************* ANALYSE PIPELINE *****************************************
@@ -352,7 +357,7 @@ function LANCEMENT_QUALITY_BAM () {
 	name=$1
 	
 	# Fichier log de sortie
-	PREPARATION_BAM_FILE=$REPERTORY/$name/log_bam.txt
+	PREPARATION_BAM_FILE=$REPERTORY/$name/log_bam_test_Routine.txt
 	
 	# Création d'un répertoire pour chaque patient
 	mkdir $REPERTORY/$name
@@ -362,6 +367,8 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "**********************************************************************\n" > $PREPARATION_BAM_FILE
 	date > $PREPARATION_BAM_FILE
 	echo -e "Génération des Fichiers d'alignement BAM pour ${name}\n" >> $PREPARATION_BAM_FILE
+
+	# Si relancement d'un patient redéplacement dans le dossier des résultats pour l'analyse
 	mv $name/*.fastq.gz .
 
 	# Récupération des fichiers fastq sens R1 et R2 correspondant à un identifiant
@@ -390,25 +397,11 @@ function LANCEMENT_QUALITY_BAM () {
 	# Génération du fichier qualité
 	echo -e "fastqc -o . $R1 $R2 -t 16" >> $PREPARATION_BAM_FILE
 	fastqc -o . $R1 $R2 -t 16
-	R1name=$(echo $R1 |cut -f1 -d.)
-	R2name=$(echo $R2 |cut -f1 -d.)
-	echo $R1name
-	echo $R2name
 	# Extension
 	html="_fastqc.html"
-	# copie des fichiers d'analyse fastqc vers le repertoire qualite
-	cp $REPERTORY/$name/$R1name$html $REPERTORY/$name/$R2name$html $QUALITY/$name/
-	# Verification fichier
-	if [ $qualite = "OK" ]
-		then
-			# Commande pour validation
-			echo -e "Attente de la validation du fichier générer par fastqc (Quality Control):"
-			echo -e "Afficher OK:  si le fichier de qualité est correcte\nNO: si incorrecte\n ********\n"
-			firefox $REPERTORY/$name/$R1name$html
-			firefox $REPERTORY/$name/$R2name$html
-			VALIDATION
-			echo -e "*******"
-	fi
+
+	# copie des fichiers d'analyse fastqc vers le repertoire qualite version 3.1 Simplification cp 
+	cp $REPERTORY/$name/*$html $QUALITY/$name/
 
 	# Suppression des fichiers brutes en attente fichier intermediaire
 	rm -dr $REPERTORY/$name/*fastqc.zip 
@@ -424,7 +417,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "Construction du fichier SAM via BAW-MEM" >>$PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE  
 	echo -e "bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam" >> $PREPARATION_BAM_FILE
-	bwa mem -t 16 -R '@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}' $BWA_REF $R1 $R2 -o tmp/${name}.sam 
+	bwa mem -t 16 -R "@RG\tID:C5-${name}\tPL:illumina\tPU:HXXX\tLB:Solexa\tSM:C5-${name}" $BWA_REF $R1 $R2 -o tmp/${name}.sam 
 	echo -e "Alignement effectué" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE 
 
@@ -439,37 +432,98 @@ function LANCEMENT_QUALITY_BAM () {
 	samtools index -@ 16 -b tmp/${name}.sort.bam
 
 	# Vérification des reads, ils sont bien mappés?
+	# Total of read
 	total=$(samtools view -h -c tmp/${name}.sort.bam )
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
-	echo -e "Total mapped: $total" >> $PREPARATION_BAM_FILE
+	echo -e "Total of read : $total" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	echo -e " Keep only mapped\n" >> $PREPARATION_BAM_FILE
 	echo -e "samtools view -F 0x4 -@ 16 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam" >> $PREPARATION_BAM_FILE
 	samtools view -F 0x4 -h -@ 16 -b tmp/${name}.sort.bam >tmp/${name}.sort_mapped.bam
-	echo -e "samtools view -f 0x800 -@ 16 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam" >> $PREPARATION_BAM_FILE
-	samtools view -f 0x800 -@ 16 -h -b tmp/${name}.sort.bam >tmp/${name}.sort_2048.bam
+
+
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
-	mapped=$(samtools view -h -@ 14 -c tmp/${name}.sort_mapped.bam)
-	echo -e "Only mapped $mapped" >> $PREPARATION_BAM_FILE
+	# Read mapped
+	mapped=$(samtools view -h -c tmp/${name}.sort_mapped.bam)
+	echo -e "Only of map : $mapped" >> $PREPARATION_BAM_FILE
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
-	unmapped=$(samtools view -f 0x4 -h -@ 10 -c -b tmp/${name}.sort.bam)
-	chimeric=$(samtools view  -f 0x800 -h -@ 10 -c -b tmp/${name}.sort.bam)
-	echo -e "Only unmapped: $unmapped" >> $PREPARATION_BAM_FILE
-	echo -e "Only chimeric: $chimeric" >> $PREPARATION_BAM_FILE
+	# Unmapped and chimeric
+	unmapped=$(samtools view -f 0x4 -h -@ 16 -c -b tmp/${name}.sort.bam)
+	chimeric=$(samtools view  -f 0x800 -h -@ 16 -c -b tmp/${name}.sort.bam)
+	echo -e "Only unmapped : $unmapped" >> $PREPARATION_BAM_FILE
+	echo -e "Only chimeric : $chimeric" >> $PREPARATION_BAM_FILE
+
 	echo -e "*******************************" >> $PREPARATION_BAM_FILE
 	date >> $PREPARATION_BAM_FILE
+
+
+	# Analyse qualité coverage All read mapped
+	samtools index -@ 16 -b tmp/${name}.sort_mapped.bam
+	echo -e "$SAMTOOLS_1_10 coverage tmp/${name}.sort_mapped.bam -m > tmp/${name}.sort_mapped_analyse_coverage.bed" >> $PREPARATION_BAM_FILE
+	$SAMTOOLS_1_10 coverage tmp/${name}.sort_mapped.bam -m > tmp/${name}.sort_mapped_analyse_coverage.bed
+	
+
 	# Intersection avec le fichier du design 
 	# avec les région intronique aussi  pour déceler les mutations de type épissage en plus
 	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
 	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED  > tmp/${name}-on-target.bam
+
+	# Analyse qualité coverage on target
+	echo -e "samtools index  -@ 16 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
+	samtools index -@ 16 -b tmp/${name}-on-target.bam
+	echo -e "$SAMTOOLS_1_10 coverage tmp/${name}-on-target.bam -m > tmp/${name}-on-target_analyse_coverage.bed" >> $PREPARATION_BAM_FILE
+	$SAMTOOLS_1_10 coverage tmp/${name}-on-target.bam -m > tmp/${name}-on-target_analyse_coverage.bed
+
+	echo -e "$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v  > tmp/${name}-off-target.bam" >> $PREPARATION_BAM_FILE
+	$BEDTOOLS intersect -a tmp/${name}.sort_mapped.bam -b $BED -v > tmp/${name}-off-target.bam
+
+	# Analyse qualité coverage on target
+	echo -e "samtools index  -@ 16 -b tmp/${name}-off-target.bam" >> $PREPARATION_BAM_FILE
+	samtools index -@ 16 -b tmp/${name}-off-target.bam
+	echo -e "$SAMTOOLS_1_10 coverage tmp/${name}-off-target.bam -m > tmp/${name}-off-target_analyse_coverage.bed" >> $PREPARATION_BAM_FILE
+	$SAMTOOLS_1_10 coverage tmp/${name}-off-target.bam -m > tmp/${name}-off-target_analyse_coverage.bed
+
+	
+	
+	# Verification off target
+	totalmapnointersect=$(samtools view -h -@ 16 -c tmp/${name}-off-target.bam )
+	echo -e "*******************************" >> $PREPARATION_BAM_FILE
+	echo -e "Total of read mapped in panel gene: $totalmapnointersect" >> $PREPARATION_BAM_FILE
+
+	# Mapped and intersected in region
+	totalmapintersect=$(samtools view -h -@ 16 -c tmp/${name}-on-target.bam )
+	echo -e "*******************************" >> $PREPARATION_BAM_FILE
+	echo -e "Total of read mapped in panel gene: $totalmapintersect" >> $PREPARATION_BAM_FILE
+	# Calcul du ratio on target
+	ratio=$(echo "($totalmapintersect/$mapped)*100" | bc -l )
+	# Calcul du ratio off target
+	ratio_off=$(echo "($totalmapnointersect/$mapped)*100" | bc -l )
+	# Conversion float to int to comparison
+	int_ratio=${ratio%.*}
+	int_ratio_off=${ratio_off%.*}
+	echo -e "Ratio of read mapped in panel gene: $int_ratio" >> $PREPARATION_BAM_FILE
+	echo -e "Ratio of read mapped out panel gene: $int_ratio_off" >> $PREPARATION_BAM_FILE
+	limite_ratio=60 
+	echo -e "Seuil ratio of read mapped in panel gene: $limite_ratio" >> $PREPARATION_BAM_FILE
+
+	# Condition
+	# Librairie non correcte
+	if [ "$int_ratio" -lt "$limite_ratio" ] 
+		then
+		echo -e "Error of library of patent - Stop program : ${name}. ratio of map intersect is only ${ratio}." >> $PREPARATION_BAM_FILE
+		echo -e "Error of library of patent - Stop program : ${name}."
+	# Sinon librairie correcte
+	else
+		echo -e "Librairie correcte pour le patient : ${name}." >> $PREPARATION_BAM_FILE	
+	fi
+
 	VERIFY_FILE	tmp/${name}-on-target.bam
 	# Génération des statistiques: compte rendu qualité
 	echo -e "Compte rendu qualité"
-	echo -e "samtools flagstat -@ 8 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat" >> $PREPARATION_BAM_FILE
-	samtools flagstat -@ 10 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat 		
+
+	echo -e "samtools flagstat -@ 16 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat" >> $PREPARATION_BAM_FILE
+	samtools flagstat -@ 16 tmp/${name}-on-target.bam > tmp/${name}.bam.sort.stat 		
 	echo -e "Reindexation" >> $PREPARATION_BAM_FILE
-	echo -e "samtools index  -@ 8 -b tmp/${name}-on-target.bam" >> $PREPARATION_BAM_FILE
-	samtools index -@ 14 -b tmp/${name}-on-target.bam
 
 	# Marquages des duplicates sans les enlever
 	echo -e "Marquage des duplicates" >> $PREPARATION_BAM_FILE
@@ -491,14 +545,14 @@ function LANCEMENT_QUALITY_BAM () {
 	# ****************************************************
 	# Analyse de la qualité de coverage Rmarkdown 
 	echo -e "R -e rmarkdown::render('${RSCRIPT}', 
-		params = list( directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='$0',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv'),
+	params = list( directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='$0',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),
 		output_file='$(pwd)/${name}_couverture_analyse.bed.html')" >> $PREPARATION_BAM_FILE
-	R -e "rmarkdown::render('${RSCRIPT}', params = list(directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='${0}',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv'),output_file='$(pwd)/${name}_couverture_analyse.bed.html')"
+	R -e "rmarkdown::render('${RSCRIPT}', params = list(directory='$(pwd)',file='${name}_couverture_analyse.bed',user='${USER}',pipeline='${0}',output='${COUV}/Statistic_couverture.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),output_file='$(pwd)/${name}_couverture_analyse.bed.html')"
 
 	echo -e "**********************************************************************\n" >> $PREPARATION_BAM_FILE
 	# Copie vers le répertoire qualité
 	# Mise en commentaire car le code R ne génère pas fichier pour quelques patients
-	#VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
+	VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
 	cp $(pwd)/${name}_couverture_analyse.bed.html $QUALITY/$name/
 	# Si analyse du fichier qualité
 	if [ $qualite = "OK" ]
@@ -512,10 +566,10 @@ function LANCEMENT_QUALITY_BAM () {
 
 	# Suppresion des fichiers tmp
 	# Suppression du fichier temporaire .sam, du bam ininial et du bam sort_mapped et du bam target
-	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*on-target.bam* tmp/*2048* 
+	rm -dr tmp/*sam tmp/${name}.sort_mapped.bam tmp/${name}.bam tmp/*2048* 
 	
 	# Copie des fichiers BAM
-	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai $QUALITY/$name/
+	cp ${name}.sort.dupmark.bam ${name}.sort.dupmark.bam.bai tmp/*analyse_coverage.bed $QUALITY/$name/
 	
 }
 
@@ -530,7 +584,7 @@ function LANCEMENT_VARIANT_CALLING () {
 	name=$1
 	mkdir $QUALITY/$name
 	# Fichier de sortie 
-	VARIANT_FILE=$REPERTORY/$name/logvariantcalling.txt
+	VARIANT_FILE=$REPERTORY/$name/logvariantcalling_Routine.txt
 	# function RAPPEL patient
 	echo -e "Lancement Variant_calling" >> $LOG
 	RAPPEL_PATIENT $name
@@ -554,11 +608,9 @@ function LANCEMENT_VARIANT_CALLING () {
 	#  the following command lines call SNPs and short INDEL
 	echo -e "samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f $BWA_FASTA ${name}.sort.dupmark.bam > variant/${METHODE3}/${name}.${METHODE3}.mpileup" >> $VARIANT_FILE 
 	samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f $BWA_FASTA ${name}.sort.dupmark.bam > variant/${METHODE3}/${name}.${METHODE3}.mpileup
-
-
 	echo "java -jar $VARSCAN mpileup2cns variant/${METHODE3}/${name}.${METHODE3}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > variant/${METHODE3}/${name}.${METHODE3}.vcf" >> $VARIANT_FILE
 	java -jar $VARSCAN mpileup2cns variant/${METHODE3}/${name}.${METHODE3}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > variant/${METHODE3}/${name}.${METHODE3}.vcf
-	VERIFY_FILE variant/${METHODE3}/${name}.${METHODE3}.vcf
+	#VERIFY_FILE variant/${METHODE3}/${name}.${METHODE3}.vcf
 	echo -e "Variant calling ${METHODE3} terminé\n" >> $VARIANT_FILE
 	date >> $VARIANT_FILE
 	# Supprimer File
@@ -698,8 +750,8 @@ function Annovar (){
 	
 	# Annotation 
 	date >> $ANNOTATION_FILE
-	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic91,cosmic89,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
-	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic91,cosmic89,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
+	echo -e "$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt" >> $ANNOTATION_FILE
+	$ANNOVAR/table_annovar.pl variant/${method}/${name}.${method}.vcf $ANNOVAR_DB -buildver hg19 -out $NAME_REP_ANNOVAR/${method}/annotation_simple_${name}.${method} -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread 16 -polish -vcfinput -xref $ANNOVAR_DB/hg19_refGene.txt 
 	date >> $ANNOTATION_FILE
 	# VCT to CSV
 	VCFToTable $name $method
@@ -719,7 +771,7 @@ function LANCEMENT_ANNOTATION () {
 	echo -e "Lancement Annotation" >> $LOG
 	RAPPEL_PATIENT $name
 	# Fichier de sortie
-	ANNOTATION_FILE=$REPERTORY/$name/log_annotation.txt
+	ANNOTATION_FILE=$REPERTORY/$name/log_annotation_Routine.txt
 	echo -e "************************************************\n" > $ANNOTATION_FILE
 	echo -e "Lancement annotation ANNOVAR:" >> $ANNOTATION_FILE
 	date >> $ANNOTATION_FILE
@@ -728,7 +780,6 @@ function LANCEMENT_ANNOTATION () {
 	# **************************	
 
 	NAME_REP_ANNOVAR=Annotation_Annovar
-	echo $NAME_REP_ANNOVAR
 	mkdir $NAME_REP_ANNOVAR
 	# GATK
 	# ****************
@@ -741,7 +792,7 @@ function LANCEMENT_ANNOTATION () {
 	Annovar $name $METHODE3
 	# Pindel 
 	# ****************
-	# Only in CALR  
+	# Only in CALR FLT3 NPM1 KMT2A
 	Annovar $name $METHODE4
 
 	date >> $ANNOTATION_FILE
@@ -761,8 +812,8 @@ function LANCEMENT_ANNOTATION () {
 	# ***************
 	# All fusion annotation
 	# Annotation simple
-	echo -e "python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name} -i ${DICT_ANNOTATION} -m All" >> $ANNOTATION_FILE
-	python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name}  -i $DICT_ANNOTATION -m All
+	echo -e "python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name} -i ${DICT_ANNOTATION}  -r ${NAME_RUN} -m All" >> $ANNOTATION_FILE
+	python3 $TRAIT_ANNOT -d  $REPERTORY/$name/$NAME_REP_ANNOVAR/Table/ -f Filter_Fichier_annotation_simple_${name}.${METHODE1}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE2}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE3}.csv,Filter_Fichier_annotation_simple_${name}.${METHODE4}.csv  -o Fusion_annotation_simple_${name}  -i $DICT_ANNOTATION -r ${NAME_RUN} -m All
 
 	# ***************
 	# Insert Dictionnary
@@ -859,7 +910,7 @@ function LANCEMENT_ANALYSE_PATIENT () {
 	# Idée partir d'une même pour les patients lancés en même temps
 	elif [ "$ANALYSE" = "Annotation" ] || [ "$ANALYSE" = "All" ] ; then
 		# Statistic one time in dictionnary
-		echo -e "python3 $DICTIONNARY -o ${DICT} -s True -outstat ${STAT_DICT}" 
+		echo -e "python3 $DICTIONNARY -o ${DICT} -s True -outstat ${STAT_DICT}" >>$LOG 
 		python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
 		VERIFY_FILE $STAT_DICT
 	else

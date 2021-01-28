@@ -41,17 +41,22 @@ def preparation_file(file,output,method):
 	data.loc[:,"IARC"] = data.loc[:,"IARC"].replace(to_replace=r"x3b", value=";", regex=True)
 	data.loc[:,"IARC"] = data.loc[:,"IARC"].replace(to_replace=r"\\", value="", regex=True)
 
-	# Cosmic 90
-	data.loc[:,"cosmic91"] = data.loc[:,"cosmic91"].replace(to_replace=r"x3b", value=";", regex=True)
-	data.loc[:,"cosmic91"] = data.loc[:,"cosmic91"].replace(to_replace=r"x3d", value="", regex=True)
-	data.loc[:,"cosmic91"] = data.loc[:,"cosmic91"].replace(to_replace=r"\\", value="", regex=True)
-	data.loc[:,"cosmic91"] = data.loc[:,"cosmic91"].replace(to_replace=":", value="", regex=True)
+	# Cosmic 92
+	data.loc[:,"cosmic92"] = data.loc[:,"cosmic92"].replace(to_replace=r"x3b", value=";", regex=True)
+	data.loc[:,"cosmic92"] = data.loc[:,"cosmic92"].replace(to_replace=r"x3d", value="", regex=True)
+	data.loc[:,"cosmic92"] = data.loc[:,"cosmic92"].replace(to_replace=r"\\", value="", regex=True)
+	data.loc[:,"cosmic92"] = data.loc[:,"cosmic92"].replace(to_replace=":", value="", regex=True)
+
 	name_Method_variant = "Method_Variant"
 	# Cosmic 89
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=r"x3b", value=";", regex=True)
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=r"x3d", value="", regex=True)
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=r"\\", value="", regex=True)
 	data.loc[:,"cosmic89"] = data.loc[:,"cosmic89"].replace(to_replace=":", value="", regex=True)
+	int_name_patient = file.split("_")[2]
+	name_patient = int_name_patient.split(".")[0]
+	print("nom_patient : ", name_patient)
+
 	name_VAF= "VAF"
 
 	i=0
@@ -59,7 +64,8 @@ def preparation_file(file,output,method):
 		while i <= data.shape[0] -1 :
 			pass
 			# colonne ID
-			data.loc[i,"ID"] = str(data.loc[i,'CHROM'])+ "_" + str(data.loc[i,'POS']) + "_" + str(data.loc[i,'REF']) + "_" + str(data.loc[i,'ALT'])
+			data.loc[i,"ID"] = str(data.loc[i,'CHROM']) + "_" + str(data.loc[i,'POS']) + "_" + str(data.loc[i,'REF']) + "_" + str(data.loc[i,'ALT'])
+
 			# colonne method
 			
 			data.loc[i,name_Method_variant] = method
@@ -67,19 +73,19 @@ def preparation_file(file,output,method):
 			data.loc[i,"IGV"] = str(data.loc[i,'CHROM'])+ ":" + str(data.loc[i,'POS'])
 
 			# Cosmic annotation
-			# Cosmic 90
-			# If exist
-			if data.loc[i,"cosmic91"] != ".":
+			# Cosmic 92
+			if data.loc[i,"cosmic92"] != ".":
 				
-				ID=data.loc[i,"cosmic91"].split(';')[0]
-				OCC=data.loc[i,"cosmic91"].split(';')[1]
+				ID=data.loc[i,"cosmic92"].split(';')[0]
+				OCC=data.loc[i,"cosmic92"].split(';')[1]
 				
-				data.loc[i,"ID_cosmic91"] = ID
-				data.loc[i,"OCC_cosmic91"] = OCC
+				data.loc[i,"ID_cosmic92"] = ID
+				data.loc[i,"OCC_cosmic92"] = OCC
 			# elif column vide
 			else:
-				data.loc[i,"ID_cosmic91"] = "."
-				data.loc[i,"OCC_cosmic91"] = "."
+				data.loc[i,"ID_cosmic92"] = "."
+				data.loc[i,"OCC_cosmic92"] = "."
+
 			# Cosmic 89
 
 			if data.loc[i,"cosmic89"] != ".":
@@ -112,11 +118,11 @@ def preparation_file(file,output,method):
 			# Calcul VAF
 			if method == "GATK" or method == "Mutect2":
 				
-				ALT = data.loc[i,"C5-${name}:AD"].split(',')[1]
-				REF = data.loc[i,"C5-${name}:AD"].split(',')[0]
+				ALT = data.loc[i,"C5-" + name_patient + ":AD"].split(',')[1]
+				REF = data.loc[i,"C5-" + name_patient + ":AD"].split(',')[0]
 				data.loc[i,"GATK_ALT"] = float(ALT)
 				data.loc[i,"GATK_REF"] = float(REF)
-				data.loc[i,name_VAF] = round(float(data.loc[i,"GATK_ALT"])/data.loc[i,"C5-${name}:DP"],4)
+				data.loc[i,name_VAF] = round(float(data.loc[i,"GATK_ALT"])/data.loc[i,"C5-" + name_patient + ":DP"],4)
 					
 			elif method == "Varscan":
 				
@@ -129,6 +135,7 @@ def preparation_file(file,output,method):
 				data.loc[i,"All_ALT"] = float(All_ALT)
 				data.loc[i,"All_REF"] = float(All_REF)
 				DP_All = data.loc[i,"All_ALT"] + data.loc[i,"All_REF"]
+				data.loc[i,"Total_DP"] = data.loc[i,"All_ALT"] + data.loc[i,"All_REF"]
 				data.loc[i,name_VAF] = round(float(data.loc[i,"All_ALT"]/(DP_All)),4)
 
 				# Dupmark
@@ -136,15 +143,16 @@ def preparation_file(file,output,method):
 				Dup_REF = data.loc[i,"All_read:AD"].split(',')[0]
 				data.loc[i,"Dup_ALT"] = float(Dup_ALT)
 				data.loc[i,"Dup_REF"] = float(Dup_REF)
-				data.loc[i,"Total_DP"] = data.loc[i,"Dup_ALT"] + data.loc[i,"Dup_REF"]
+				data.loc[i,"Total_DP_Alt"] = data.loc[i,"Dup_ALT"] + data.loc[i,"Dup_REF"]
 				data.loc[i,name_VAF + "Dup"] = round(float(data.loc[i,"Dup_ALT"] / data.loc[i,"Total_DP"] ),4)
 
 			else: 
 				print("FLT3 or error")
 				sys.exit(1)
-			# Cosmic 90
-			data.loc[:,"ID_cosmic91"] = data.loc[:,"ID_cosmic91"].replace(to_replace="ID", value="", regex=True)
-			data.loc[:,"OCC_cosmic91"] = data.loc[:,"OCC_cosmic91"].replace(to_replace="OCCURENCE", value="", regex=True)
+			# Cosmic 92
+			data.loc[:,"ID_cosmic92"] = data.loc[:,"ID_cosmic92"].replace(to_replace="ID", value="", regex=True)
+			data.loc[:,"OCC_cosmic92"] = data.loc[:,"OCC_cosmic92"].replace(to_replace="OCCURENCE", value="", regex=True)
+
 			# Cosmic 89
 			data.loc[:,"ID_cosmic89"] = data.loc[:,"ID_cosmic89"].replace(to_replace="ID", value="", regex=True)
 			data.loc[:,"OCC_cosmic89"] = data.loc[:,"OCC_cosmic89"].replace(to_replace="OCCURENCE", value="", regex=True)
@@ -162,45 +170,51 @@ def preparation_file(file,output,method):
 	name = 'ALL_VAF_' + output
 	# Write file
 	data.to_csv(name, sep = ';')
-	return(data)
+	return(data,name_patient)
 
 # Function Delete columns and clean table First filter to suppress column
-def action_column(data,method):
+def action_column(data,method,name_patient):
 	"""
 		Input : Table annotation with column redundance and reorder column
 		Output: Table annotation without column redundance and reorder column
 	"""
 	# ****************
 	# First suppresion column
-	commun_info=['Xref.refGene','GeneDetail.refGene','ALLELE_END','cosmic91','IARC']
+	commun_info=['Xref.refGene','GeneDetail.refGene','ALLELE_END','IARC','cosmic92','cosmic89']
 	data.drop(commun_info, axis='columns', inplace=True)
 	name_DP = "Total_DP" 
+	name_ALT = "Total_ALT"
 	name_VAF = "VAF"
 	# ,'DS'
 	if method == "GATK":
-		data.rename(columns={'C5-${name}:DP': name_DP}, inplace=True)
+
+		data.rename(columns={'C5-' + name_patient + ':DP': name_DP}, inplace=True)
+		data.rename(columns={'GATK_ALT': name_ALT}, inplace=True)
 		info_delete=['AC','AF','AN','BaseQRankSum','ExcessHet','FS','InbreedingCoeff',
-					'MLEAC','MLEAF','MQRankSum','QD','ReadPosRankSum','SOR','C5-${name}:AD',
-					'C5-${name}:PL','GATK_REF','GATK_ALT','DP','C5-${name}:GT','QUAL','MQ','C5-${name}:GQ']
+					'MLEAC','MLEAF','MQRankSum','QD','ReadPosRankSum','SOR','C5-' + name_patient + ':AD',
+					'C5-' + name_patient + ':PL','GATK_REF','DP','C5-' + name_patient + ':GT','QUAL','MQ','C5-' + name_patient + ':GQ']
 		
 	elif method == "Mutect2":
-		
-		data = data.rename(columns={'C5-${name}:DP':name_DP})
+
+		data.rename(columns={'C5-' + name_patient + ':DP':name_DP}, inplace=True)
+		data.rename(columns={'GATK_ALT': name_ALT}, inplace=True)
 		info_delete=['QUAL','ECNT','MBQ','MFRL','MMQ','MPOS','NCount','PON','POPAF','RPA','RU',
 					'SEQQ','STR','STRANDQ','STRQ','TLOD','UNIQ_ALT_READ_COUNT','CONTQ','GERMQ','NALOD'
-					,'NLOD','OCM','ROQ','C5-${name}:PID','C5-${name}:PL','C5-${name}:AD','C5-${name}:GT',
-					'GATK_REF','GATK_ALT','DP','C5-${name}:AF','C5-${name}:F1R2','C5-${name}:F2R1','C5-${name}:GQ','C5-${name}:PGT','C5-${name}:PS','C5-${name}:SB','AF']
+					,'NLOD','OCM','ROQ','C5-' + name_patient + ':PID','C5-' + name_patient + ':PL','C5-' + name_patient + ':AD','C5-' + name_patient + ':GT',
+					'GATK_REF','DP','C5-' + name_patient + ':AF','C5-' + name_patient + ':F1R2','C5-' + name_patient + ':F2R1','C5-' + name_patient + ':GQ','C5-' + name_patient + ':PGT','C5-' + name_patient + ':PS','C5-' + name_patient + ':SB','AF']
 		
 
 	elif method == "Varscan":
-		
 
-		data = data.rename(columns={'Sample1:DP':name_DP})
-		info_delete=['QUAL','ADP','NC','HET','HOM','WT','Sample1:SDP','Sample1:AD','Sample1:RD',
+		data.rename(columns={'Sample1:DP':name_DP}, inplace=True)
+		data.rename(columns={'Sample1:AD':name_ALT}, inplace=True)
+		info_delete=['QUAL','ADP','NC','HET','HOM','WT','Sample1:SDP','Sample1:RD',
 					'Sample1:FREQ','Sample1:RBQ','Sample1:ABQ','Sample1:RDF','Sample1:RDR',
 					'Sample1:ADF','Sample1:ADR','Sample1:GT','Sample1:GQ','Sample1:PVAL','AF']
 	
 	elif method == "Pindel":
+
+		data.rename(columns={'All_ALT':name_ALT}, inplace=True)
 		diff_Pindel = ["END","HOMLEN","HOMSEQ","SVLEN","SVTYPE","NTLEN"]
 
 		info_delete=["PF","All_read:PL","All_read:GT","All_read:RD","All_read:AD","Duplicate_mark:PL","Duplicate_mark:GT","Duplicate_mark:RD","Duplicate_mark:AD"]
@@ -214,6 +228,7 @@ def action_column(data,method):
 	# ****************
 	#First Reorder column
 	cols = list(data.columns.values)
+	
 	reorder=[]
 	for c, value in enumerate(cols, 0):
 
@@ -221,15 +236,19 @@ def action_column(data,method):
 		if value == "ANNOVAR_DATE":
 			reorder.append("Method_Variant")
 			reorder.append(name_DP)
+			reorder.append(name_ALT)
 			reorder.append(name_VAF)
 
 		# Si value = cytoband reinsertion des colonnes Occurences
 		elif value == "cytoBand":
 			reorder.append(value)
 			reorder.append("IGV")
-			# Cosmic 90
-			reorder.append("ID_cosmic91")
-			reorder.append("OCC_cosmic91")
+
+			# snp138
+			reorder.append("avsnp138")
+			# Cosmic 92
+			reorder.append("ID_cosmic92")
+			reorder.append("OCC_cosmic92")
 
 			# Cosmic 89
 			reorder.append("ID_cosmic89")
@@ -256,7 +275,7 @@ def action_column(data,method):
 	return reindex_data
 
 # Réalisation des filtres simples sur les variants avant l'entrée dans le dictionnaire
-def filter_annotation_dico(annotation,out,method):
+def filter_annotation_dico(annotation,out,method,patient_nom):
 	"""
 		Input: Fichier combiné
 		Output: Fichier Filtré sur les variants d'interet 
@@ -272,17 +291,25 @@ def filter_annotation_dico(annotation,out,method):
 	# ****************
 	#Pindel
 	# To keep
-	# FLT3 exon 14: chr13:28608219-28608351
-	# FLT3 exon 15: chr13:28608024-28608128
+	# FLT3 exon 14: chr13:28608219-28608351 1%
+	# FLT3 exon 15: chr13:28608024-28608128	1%
 	FLT3_type = ["INS","DUP:TANDEM"]
-	# CALR exon 9 ch19:13054527-13055303
+	FLT3_VAF = 0.01
+	# CALR exon 9 ch19:13054527-13055303 pour CALR 2% 
 	CALR_type = ["DEL"]
+	# W288 recherche Hotspot	1%
+	NPM1_TYPE = ["INS"]
+	NPM1_VAF = 0.01
+	# KMT2A 2 %
+	KMT2A_TYPE = ["DEL","DUP:TANDEM"]
+	KMT2A_VAF = 0.01
 	#initialization of list of line removed by filter
 	remove = []
 	i = 0
 	name_VAF = "VAF"
 	# Filtre des VAF <2% sont eliminées
 	Filter_VAF = 0.02
+	
 	
 	# Filter
 	# Pour le dictionnaire ne pas enlever les polymorphismes
@@ -302,21 +329,20 @@ def filter_annotation_dico(annotation,out,method):
 			remove.append(i)
 		
 		elif method == "Pindel":
-			# Cas chr13:FLT3
+			# Cas chr13:FLT3 Exon 14 and 15 
 			# premier filtre sur le type
 			if annotation.loc[i,"Gene.refGene"] == "FLT3" and annotation.loc[i,"SVTYPE"] not in FLT3_type:
 				remove.append(i)
 			# Deuxieme filtre sur lA VAF
-			if annotation.loc[i,"Gene.refGene"] == "FLT3"and annotation.loc[i,name_VAF] < 0.01:
+			if annotation.loc[i,"Gene.refGene"] == "FLT3" and annotation.loc[i,name_VAF] < FLT3_VAF:
 				remove.append(i)
 			# Cas chr19 CALR
 			# premier filtre sur le type
-			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,"SVTYPE"] not in CALR_type:
+			if annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,"SVTYPE"] not in CALR_type:
 				remove.append(i)	
 			# Deuxieme filtre sur lA VAF
-			elif annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF:
+			if annotation.loc[i,"Gene.refGene"] == "CALR" and annotation.loc[i,name_VAF] < Filter_VAF:
 				remove.append(i)
-			# Passge du filtre
 			else:	
 				annotation.loc[i,"FILTER"]="PASS"
 
@@ -333,7 +359,7 @@ def filter_annotation_dico(annotation,out,method):
 	# Creation du nouvelle index ID 
 	annotation.set_index('ID',inplace=True)
 	# Call function Clean columns
-	annotation_filter = action_column(annotation,method)
+	annotation_filter = action_column(annotation,method,patient_nom)
 	# enregistrement 
 	filter_out ='Filter_' + out
 	annotation_filter.to_csv(filter_out, sep = ';')
@@ -344,44 +370,16 @@ def filter_annotation_dico(annotation,out,method):
 # **************************************************************
 # Partie Concatenation des fichiers et figures
 
-# Figure sur les fichiers d'annotation 
-def Figure (all_file,output):
-
-	# Concatenate
-	concatenate = pd.concat(all_file, axis=0,join='outer',sort=False,keys=["GATK","Mutect2","Varscan","Pindel"])
-	GATK = concatenate.loc["GATK"].index
-	Mutect = concatenate.loc["Mutect2"].index
-	Varscan = concatenate.loc["Varscan"].index
-	repartition_variant = concatenate['Method_Variant'].value_counts()
-	
-	set_GATK = set(GATK) 
-	
-	set_Mutect = set(Mutect)
-	
-	set_Varscan = set(Varscan) 
-	
-	Liste = list(set_GATK) + list (set_Mutect) + list(set_Varscan) 
-
-	unique_liste = sorted(list(set(Liste)))
-	print("unique_list",len(unique_liste))
-	v = venn3(subsets=[set_GATK, set_Mutect, set_Varscan],set_labels=('GATK', 'Mutect', 'Varscan'))
-	c = venn3_circles(subsets=(set_GATK, set_Mutect, set_Varscan),linestyle='dashed', linewidth=0.5)
-	name = output + ".png"
-	plt.savefig(name)
-	# GATK en rouge, Mutect en vert, varscan en bleu
-	# Statistique sur les groupes d'ID 
-	linebygroup = concatenate.groupby('ID').size()
-	#print(linebygroup)
 
 # Fusion des fichiers en un seul avec les differents appel de variant
-def Fusion_file(data1,data2,data3,data4,all_file,output):
+def Fusion_file(data1,data2,data3,data4,all_file,output,name_run):
 	"""
 		Input: Fichiers d'annotation des 4 appels de variants
 		Output: Fichier (Fusion) Fusion des Fichiers et calcul 
 	"""
 	# Preparation du fichier ne contenant que les annotations
 	concatenate = pd.concat(all_file, axis=0,join='outer',sort=False)
-	liste = ["Method_Variant","Total_DP","VAF"]
+	liste = ["Method_Variant","Total_DP","Total_ALT","VAF"]
 	# suppression des colonnes
 	concatenate.drop(liste, axis='columns', inplace=True)
 	# Suppression des doublons
@@ -397,28 +395,36 @@ def Fusion_file(data1,data2,data3,data4,all_file,output):
 	# ************************************
 
 	# Creation New column
+	combine_file["PATIENT_ID"] = output.split("_")[3]
+	combine_file["NAME_RUN"] = name_run
 	# Column of validation for engineer
 	combine_file["Validation_BIO_ING"] = "."
 	# Column for class of Mutation
 	combine_file["Classification_mutation"] = "."
 	# Calcul de statistique
-	Col_DP = ['Total_DP_GATK','Total_DP_Mutect2','Total_DP_Varscan','Total_DP_Pindel']
+	col_DP = ['Total_DP_GATK','Total_DP_Mutect2','Total_DP_Varscan','Total_DP_Pindel']
 	col_VAF = ['VAF_GATK','VAF_Mutect2','VAF_Varscan','VAF_Pindel']
+	col_Alt = ['Total_ALT_GATK','Total_ALT_Mutect2','Total_ALT_Varscan','Total_ALT_Pindel']
 	# Calcul VAF et DP mean
 	combine_file['Mean_VAF'] = combine_file[col_VAF].mean(skipna=True,axis=1)
 	# Calcul Mean DP
-	combine_file['Mean_DP'] = combine_file[Col_DP].mean(skipna=True,axis=1)
-	combine_file['Mean_DP'] = combine_file['Mean_DP'].round(3)
+	combine_file['Mean_DP'] = combine_file[col_DP].mean(skipna=True,axis=1)
+	# Calcul Mean Alt
+	combine_file['Mean_ALT'] = combine_file[col_Alt].mean(skipna=True,axis=1)
+	
+	# Arrondi
+	combine_file['Mean_ALT'] = combine_file['Mean_ALT'].round(1)
+	combine_file['Mean_DP'] = combine_file['Mean_DP'].round(1)
 	combine_file['Mean_VAF'] = combine_file['Mean_VAF'].round(3)	
 	# call column transcript
 
 	# Reorder column
 	cols = list(combine_file.columns.values)
 	reorder=[]
-	liste_VAF = ["Mean_VAF","Mean_DP","Method_Variant_GATK","Total_DP_GATK","VAF_GATK","Method_Variant_Mutect2","Total_DP_Mutect2","VAF_Mutect2","Method_Variant_Varscan","Total_DP_Varscan","VAF_Varscan","Method_Variant_Pindel","Total_DP_Pindel","VAF_Pindel"]
-	liste_annot = ["CHROM","Validation_BIO_ING","Classification_mutation","cytoBand","IGV","POS","REF","ALT","Func.refGene","Gene.refGene","ExonicFunc.refGene","AAChange.refGene"]
+	liste_VAF = ["Mean_VAF","Mean_DP","Mean_ALT","Method_Variant_GATK","Total_DP_GATK","Total_ALT_GATK","VAF_GATK","Method_Variant_Mutect2","Total_DP_Mutect2","Total_ALT_Mutect2","VAF_Mutect2","Method_Variant_Varscan","Total_DP_Varscan","Total_ALT_Varscan","VAF_Varscan","Method_Variant_Pindel","Total_DP_Pindel","Total_ALT_Pindel","VAF_Pindel"]
+	liste_annot = ["PATIENT_ID","CHROM","Validation_BIO_ING","Classification_mutation","cytoBand","IGV","POS","REF","ALT","Func.refGene","Gene.refGene","ExonicFunc.refGene","AAChange.refGene"]
 	liste_methode = ["Method_Variant_GATK","Method_Variant_Mutect2","Method_Variant_Varscan","Method_Variant_Pindel"]
-	liste_annotation = ["ID_cosmic91","OCC_cosmic91","ID_cosmic89","OCC_cosmic89","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
+	liste_annotation = ["ID_cosmic92","OCC_cosmic92","ID_cosmic89","OCC_cosmic89","avsnp138","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
 	for i in liste_annot:
 		reorder.append(i)
 	# Ajout des VAF seulement et pas de Methode variant
@@ -428,8 +434,10 @@ def Fusion_file(data1,data2,data3,data4,all_file,output):
 	#Ajout des annotations
 	for annot in liste_annotation:
 		reorder.append(annot)
+	reorder.append("NAME_RUN")
 	reorder.append("FILTER")
 	reorder.append("ANNOVAR_DATE")
+
 	#reindexation des colonnes
 	combine_file_reorder = combine_file.reindex(columns =reorder)
 	#transformation des Nan en .
@@ -439,7 +447,7 @@ def Fusion_file(data1,data2,data3,data4,all_file,output):
 	return(fusion_file)
 
 # Concatenation of file
-def Combine_figure(files,output):
+def Combine_figure(files,output,name_run):
 	"""
 	Input 1: All file separate by ,
 	Input 2: output file concatenate all files and make venn diagrame in png format
@@ -461,9 +469,9 @@ def Combine_figure(files,output):
 
 	All_file = [data1, data2,data3,data4]
 	# Creation of diagram de venn
-	#Figure(All_file,output)
+
 	# Creation of final combine file
-	combine_annotation = Fusion_file(data1,data2,data3,data4,All_file,output)
+	combine_annotation = Fusion_file(data1,data2,data3,data4,All_file,output,name_run)
 	return(combine_annotation)
 
 # Filter annotation for Analyse patient against gnomAD
@@ -539,13 +547,13 @@ def final_statistic_database (name_patient,file_database,dico_annotation,out):
 	cols = list(file_patient.columns.values)
 	reorder=[]
 	# All line VAF
-	liste_VAF = ["Freq_Database","Mean_VAF","Mean_DP","Method_Variant_GATK","Total_DP_GATK","VAF_GATK","Method_Variant_Mutect2","Total_DP_Mutect2","VAF_Mutect2","Method_Variant_Varscan","Total_DP_Varscan","VAF_Varscan","Method_Variant_Pindel","Total_DP_Pindel","VAF_Pindel"]
+	liste_VAF = ["Freq_Database","Mean_VAF","Mean_DP","Mean_ALT","Method_Variant_GATK","Total_DP_GATK","Total_ALT_GATK","VAF_GATK","Method_Variant_Mutect2","Total_DP_Mutect2","Total_ALT_Mutect2","VAF_Mutect2","Method_Variant_Varscan","Total_DP_Varscan","Total_ALT_Varscan","VAF_Varscan","Method_Variant_Pindel","Total_DP_Pindel","Total_ALT_Pindel","VAF_Pindel"]
 	# Annotation Primaire
-	liste_annot = ["CHROM","Validation_BIO_ING","Classification_mutation","cytoBand","IGV","POS","REF","ALT","Func.refGene","Gene.refGene","ExonicFunc.refGene","AAChange.refGene","Favorite_transcript"]
+	liste_annot = ["PATIENT_ID","CHROM","Validation_BIO_ING","Classification_mutation","cytoBand","IGV","POS","REF","ALT","Func.refGene","Gene.refGene","ExonicFunc.refGene","AAChange.refGene","Favorite_transcript"]
 	# Liste méthode (necessaire suppresion)
 	liste_methode = ["Method_Variant_GATK","Method_Variant_Mutect2","Method_Variant_Varscan","Method_Variant_Pindel"]
 	# Liste annotation secondaire
-	liste_annotation = ["ID_cosmic91","OCC_cosmic91","ID_cosmic89","OCC_cosmic89","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
+	liste_annotation = ["ID_cosmic92","OCC_cosmic92","ID_cosmic89","OCC_cosmic89","avsnp138","Genomic_IARC","Transactivation_Structure_Function_IARC","AF_popmax","AF_male","AF_female","AF_raw","AF_afr","AF_sas","AF_amr","AF_eas","AF_nfe","AF_fin","AF_asj","AF_oth","non_topmed_AF_popmax","non_neuro_AF_popmax","non_cancer_AF_popmax","controls_AF_popmax","CLNALLELEID_2020","CLNDN_2020","CLNDISDB_2020","CLNREVSTAT_2020","CLNSIG_2020","SIFT_pred","Polyphen2_HDIV_pred","Polyphen2_HVAR_pred","MutationTaster_pred","FATHMM_pred","M-CAP_pred","CADD_phred","Interpro_domain","ICGC_Id","ICGC_Occurrence"]
 	for i in liste_annot:
 		reorder.append(i)
 	# Ajout des VAF seulement et pas de Methode variant
@@ -555,12 +563,14 @@ def final_statistic_database (name_patient,file_database,dico_annotation,out):
 	#Ajout des annotations
 	for annot in liste_annotation:
 		reorder.append(annot)
+	reorder.append("NAME_RUN")
 	reorder.append("FILTER")
 	reorder.append("ANNOVAR_DATE")
 	#reindexation des colonnes
 	file_patient_reorder = file_patient_popmax.reindex(columns =reorder)
 	# Write of file
-	file_patient_reorder.to_csv(out, sep = ';')
+	file_patient_reorder.to_csv(out,sep=";")
+	file_patient_reorder.to_excel(out.split(".")[0] + ".xlsx", sheet_name = file_patient_reorder["PATIENT_ID"].unique()[0])
 
 # Creation de la colonne FreqDatabase
 def freq_database(file_patient,file_database):
@@ -775,6 +785,13 @@ if __name__ == '__main__':
 		type=str,
 		help="Integration of new artefact information in same database"
 	)
+	# Add specification du nom de fichier
+	parser.add_argument("-r", "--namerun",
+		dest="namerun",
+		required=False,
+		type=str,
+		help="Notation du nom du RUN dans le rapport"
+	)
 	
 	# ******************
 	#  End Final Statistic Database
@@ -811,14 +828,14 @@ if __name__ == '__main__':
 	# Preparation annotation file by method
 	if args.method in Variant_calling:
 		# Preparation du fichier d'annotation et calcul du VAF
-		data_annotation = preparation_file(args.file,args.out,args.method)
+		data_annotation,nom_patient = preparation_file(args.file,args.out,args.method)
 		# Réalisation des filtres simple 
-		filter_annotation_dico(data_annotation,args.out,args.method)
+		filter_annotation_dico(data_annotation,args.out,args.method,nom_patient)
 	#  Combination of file
 	elif args.method == "All":
-
+		# args.name_run
 		# Combine figure and annotation
-		annotation_combine = Combine_figure(args.file,args.out)
+		annotation_combine = Combine_figure(args.file,args.out,args.namerun)
 		
 		# Filter
 		data = filter_annotation(annotation_combine,args.out)
@@ -831,7 +848,7 @@ if __name__ == '__main__':
 		final_statistic_database(args.file,args.database,dico_annotation,args.out)
 	# Error
 	else:
-		print("error or call of function")
+		print("Error or call of function")
 		sys.exit(1)
 	print("Le programme a traité le fichier {:30s}.".format(args.file))
 	sys.exit(0)

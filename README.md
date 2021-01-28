@@ -2,23 +2,25 @@
 # *********************
 #  Pipeline bioinformatique SMPHD                 
 #	Données NGS                   
-#   Version 3.0, version stable
+
 # *********************
 
 # Tutoriel
-Code principale pipeline_SMPHD_V3.0.sh
+Code principale pipeline_SMPHD.sh
 appel des codes python
 
 # Versioning tools
 ## Tools
 - samtools 1.9
+- samtools 1.10 en soutien coverage non rendu
 - bwa mem  
 ## Call variant
 - Varscan 2.4.3
 - GATK Haplotype caller et Mutect 4.1.5
 - Pindel
 ## Annotation
-- Cosmic 89 et Cosmic 91
+- ajout avsnp138
+- Cosmic 89 et Cosmic 92
 - cytoBand
 - gnomad211_exome
 - clinvar_20200316
@@ -35,3 +37,16 @@ appel des codes python
 - Cosmic 92
 - NPM1
 - Bed target %
+
+- Ajout de Cosmic 92
+- Remplacement de la database clinvar 20200316 à la place de clinvar20190305
+- Affichage du % of target dans R
+# 3.1
+- NPM1
+## 3.3
+- Analyse of target
+- Inclusion de cosmic 92 à la place de cosmic 91
+- Ajout de dbsnp138
+- Affichage du % of target dans R
+- Ajout dans le fichier csv
+

@@ -39,7 +39,11 @@ def load_dictionnary(name):
 	"""
 	load dictionnary 
 	"""
+	print("name")
+	print(name)
 	with open(name,"r") as infile:
+		print ("infile")
+		print(infile)
 		dico_database = json.load(infile)
 	return(dico_database)
 
@@ -293,4 +297,3 @@ if __name__ == '__main__':
 	
 	
 	sys.exit(0)
-#python3 /home/t-chu-027/Bureau/Recherche/Pipeline/SMPHD_v2.8/database_dictionnary_v2.8.py -o /media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_Database_variant.json -s True -outstat /media/t-chu-027/Elements/Result_NGS/Dictionnary_database/Project_FIM_Database_variant.csv
