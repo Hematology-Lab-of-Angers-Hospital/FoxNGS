@@ -180,7 +180,7 @@ function DATABASE () {
 	# Fichier
 	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7.bed
 	# Bed pour couverture et l'analyse qualité R
-	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel_v7.bed
+	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel.bed
 	# Variant
 	# Fichier Bed Pindel Ajout de NPM1
 	BED_PINDEL=/media/t-chu-027/DATAPART2/Database/Variant/Pindel_search_CALR-9_FLT3-14-15.bed
