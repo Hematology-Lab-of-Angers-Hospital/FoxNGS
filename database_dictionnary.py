@@ -39,11 +39,9 @@ def load_dictionnary(name):
 	"""
 	load dictionnary 
 	"""
-	print("name")
-	print(name)
+
 	with open(name,"r") as infile:
-		print ("infile")
-		print(infile)
+
 		dico_database = json.load(infile)
 	return(dico_database)
 
