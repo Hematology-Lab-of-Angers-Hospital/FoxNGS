@@ -41,12 +41,16 @@ appel des codes python
 - Ajout de Cosmic 92
 - Remplacement de la database clinvar 20200316 à la place de clinvar20190305
 - Affichage du % of target dans R
-# 3.1
-- NPM1
+
+
 ## 3.3
 - Analyse of target
 - Inclusion de cosmic 92 à la place de cosmic 91
 - Ajout de dbsnp138
 - Affichage du % of target dans R
 - Ajout dans le fichier csv
+
+## 3.4
+- Mutect Filter
+- FLT3 Hotspot ?
 
