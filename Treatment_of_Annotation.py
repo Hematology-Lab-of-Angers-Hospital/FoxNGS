@@ -123,6 +123,7 @@ def preparation_file(file,output,method):
 				data.loc[i,"GATK_ALT"] = float(ALT)
 				data.loc[i,"GATK_REF"] = float(REF)
 				data.loc[i,name_VAF] = round(float(data.loc[i,"GATK_ALT"])/data.loc[i,"C5-" + name_patient + ":DP"],4)
+				
 					
 			elif method == "Varscan":
 				
@@ -188,15 +189,18 @@ def action_column(data,method,name_patient):
 	# ,'DS'
 	if method == "GATK":
 
-		data.rename(columns={'C5-' + name_patient + ':DP': name_DP}, inplace=True)
+		data.rename(columns={'C5-${name}:DP': name_DP}, inplace=True)
+		#data.rename(columns={'C5-' + name_patient + ':DP': name_DP}, inplace=True)
 		data.rename(columns={'GATK_ALT': name_ALT}, inplace=True)
 		info_delete=['AC','AF','AN','BaseQRankSum','ExcessHet','FS','InbreedingCoeff',
 					'MLEAC','MLEAF','MQRankSum','QD','ReadPosRankSum','SOR','C5-' + name_patient + ':AD',
 					'C5-' + name_patient + ':PL','GATK_REF','DP','C5-' + name_patient + ':GT','QUAL','MQ','C5-' + name_patient + ':GQ']
+
 		
 	elif method == "Mutect2":
 
-		data.rename(columns={'C5-' + name_patient + ':DP':name_DP}, inplace=True)
+		#data.rename(columns={'C5-' + name_patient + ':DP':name_DP}, inplace=True)
+		data.rename(columns={'C5-${name}:DP':name_DP}, inplace=True)
 		data.rename(columns={'GATK_ALT': name_ALT}, inplace=True)
 		info_delete=['QUAL','ECNT','MBQ','MFRL','MMQ','MPOS','NCount','PON','POPAF','RPA','RU',
 					'SEQQ','STR','STRANDQ','STRQ','TLOD','UNIQ_ALT_READ_COUNT','CONTQ','GERMQ','NALOD'
