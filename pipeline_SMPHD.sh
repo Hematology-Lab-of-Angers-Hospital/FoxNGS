@@ -178,7 +178,7 @@ function DATABASE () {
 	# ********************************************
 	# Database 
 	# Fichier
-	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7.bed
+	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7_UBA1.bed
 	# Bed pour couverture et l'analyse qualité R
 	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel_v7.bed
 	# Variant
