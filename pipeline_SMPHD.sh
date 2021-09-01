@@ -539,8 +539,8 @@ function LANCEMENT_QUALITY_BAM () {
 	# ****************************************************
 	# Pour analyser la couverture nous nous intéressons qu'aux exons pour la génération du fichier qualité : les introns sont enlevés
 	echo -e "Analyse couverture" >> $PREPARATION_BAM_FILE
-	echo -e "$BEDTOOLS coverage -sorted -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed" >> $PREPARATION_BAM_FILE
-	$BEDTOOLS coverage -sorted -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed	
+	echo -e "$BEDTOOLS coverage -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed" >> $PREPARATION_BAM_FILE
+	$BEDTOOLS coverage -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed	
 			
 	# ****************************************************
 	# Analyse de la qualité de coverage Rmarkdown 
