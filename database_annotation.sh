@@ -89,6 +89,10 @@ perl /home/t-chu-027/BioNGSTools/annovar/prepare_annovar_user.pl -dbtype cosmic 
 #************************
 # gnomad211_exome
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar gnomad211_exome humandb_annovar/
+# 
+perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar gnomad211_genome humandb_annovar/
+
+gnomad211_genome
 # clinvar_20190305
 https://github.com/macarthur-lab/clinvar
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar clinvar_20200316 humandb_annovar/
