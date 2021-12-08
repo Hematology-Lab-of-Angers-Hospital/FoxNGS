@@ -552,7 +552,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "**********************************************************************\n" >> $PREPARATION_BAM_FILE
 	# Copie vers le répertoire qualité
 	# Mise en commentaire car le code R ne génère pas fichier pour quelques patients
-	VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
+	#VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
 	cp $(pwd)/${name}_couverture_analyse.bed.html $QUALITY/$name/
 	# Si analyse du fichier qualité
 	if [ $qualite = "OK" ]
