@@ -59,10 +59,10 @@ def Insertion_dictionnaire(dico_database,name_file):
 
 	# Declaration du nom de l'echantillon
 	# Non ecriture de TEM HORIZON dans le dictionnaire == Passage de l'insertion
-	liste_exclure = ["TEM-HO","EEQ"]
+	liste_exclure = ["TEM-HO","EEQ","Undetermined"]
 
 
-	if echantillon.startswith(liste_exclure[0]) or echantillon.startswith(liste_exclure[1]):
+	if echantillon.startswith(liste_exclure[0]) or echantillon.startswith(liste_exclure[1]) or echantillon.startswith(liste_exclure[2]):
 		print('No match echantillon of control',echantillon)
 		sys.exit(0)
 	else:
@@ -155,7 +155,7 @@ def statistic(dico_database,out):
 	liste_patient = ['0409-GJ-09112010','0422-RC-19072006',"0013-SJ-30092010","0025-CR-13012010","0034-GA-29102009",
 					"0083-WP-07012011","0161-WF-07102011","0165-ND-30062011","0224-BC-10062009","0737-KJ-16112011",
 					"0113-GM-17092013","0117-GP-25012010","0294-CR-14112008","0041-LB-21032011","0628-BJ-07062016",
-					"0859-DG-16042015"]
+					"0859-DG-16042015","Undetermined-test"]
 	tab = "\t" 
 	with open(out,"w") as stat_out:
 		
