@@ -2,7 +2,7 @@
 # Auteur: Maxime Renard
 # Bioinformatique
 # Laboratoire d'hématologie
-# Pipeline Recherche de variant sur le panel de 78 gènes pour le SMP
+# Pipeline Recherche de variant sur le panel de 70 gènes pour le SMP
 # ajout du gène UBA1
 # Dernière Modification: 26/01/21
 
