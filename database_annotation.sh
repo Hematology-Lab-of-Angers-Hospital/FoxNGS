@@ -51,6 +51,16 @@ awk -v OFS="\t" -F "\t" 'gsub("GENOMIC_MUTATION_ID","Mutation ID");1' CosmicMuta
 sed '1d' mon_fichier.txt > CosmicMutantExport.tsv
 # Création
 perl /home/t-chu-027/BioNGSTools/annovar/prepare_annovar_user.pl -dbtype cosmic Cosmic_v92/CosmicMutantExport.tsv -vcf Cosmic_v92/CosmicCodingMuts.vcf > humandb_annovar/hg19_cosmic92.txt
+
+# Cosmic 94 
+mv CosmicMutantExport.tsv CosmicMutantExport_error.tsv
+# Transformation du nom de colonne nécessaire
+awk -v OFS="\t" -F "\t" 'gsub("GENOMIC_MUTATION_ID","Mutation ID");1' CosmicMutantExport_error.tsv > CosmicMutantExport_2.tsv
+sed '1d' CosmicMutantExport_2.tsv > CosmicMutantExport.tsv
+# Perl
+perl /home/t-chu-027/BioNGSTools/annovar/prepare_annovar_user.pl -dbtype cosmic Cosmic_v94_280521/CosmicMutantExport.tsv -vcf Cosmic_v94_280521/CosmicCodingMuts.vcf > humandb_annovar/hg19_cosmic94.txt
+
+
 # CNV 
 # **************************************************
 
@@ -79,6 +89,10 @@ perl /home/t-chu-027/BioNGSTools/annovar/prepare_annovar_user.pl -dbtype cosmic 
 #************************
 # gnomad211_exome
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar gnomad211_exome humandb_annovar/
+# 
+perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar gnomad211_genome humandb_annovar/
+
+gnomad211_genome
 # clinvar_20190305
 https://github.com/macarthur-lab/clinvar
 perl /home/t-chu-027/BioNGSTools/annovar/annotate_variation.pl -buildver hg19 -downdb -webfrom annovar clinvar_20200316 humandb_annovar/

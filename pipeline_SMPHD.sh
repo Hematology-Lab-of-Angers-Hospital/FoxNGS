@@ -178,7 +178,7 @@ function DATABASE () {
 	# ********************************************
 	# Database 
 	# Fichier
-	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7.bed
+	BED=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Sure_Select_design/SureSelect-HEMATO-v7_UBA1.bed
 	# Bed pour couverture et l'analyse qualité R
 	BEDEXON=/media/t-chu-027/DATAPART2/Database/Fichier_intersection_bed/Analyse_coverage/DESIGN-FH-EXONS-gene_panel.bed
 	# Variant
@@ -539,8 +539,8 @@ function LANCEMENT_QUALITY_BAM () {
 	# ****************************************************
 	# Pour analyser la couverture nous nous intéressons qu'aux exons pour la génération du fichier qualité : les introns sont enlevés
 	echo -e "Analyse couverture" >> $PREPARATION_BAM_FILE
-	echo -e "$BEDTOOLS coverage -sorted -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed" >> $PREPARATION_BAM_FILE
-	$BEDTOOLS coverage -sorted -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed	
+	echo -e "$BEDTOOLS coverage -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed" >> $PREPARATION_BAM_FILE
+	$BEDTOOLS coverage -a $BEDEXON -b $REPERTORY/$name/${name}.sort.dupmark.bam -d >$REPERTORY/$name/${name}_couverture_analyse.bed	
 			
 	# ****************************************************
 	# Analyse de la qualité de coverage Rmarkdown 
@@ -552,7 +552,7 @@ function LANCEMENT_QUALITY_BAM () {
 	echo -e "**********************************************************************\n" >> $PREPARATION_BAM_FILE
 	# Copie vers le répertoire qualité
 	# Mise en commentaire car le code R ne génère pas fichier pour quelques patients
-	VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
+	#VERIFY_FILE $(pwd)/${name}_couverture_analyse.bed.html
 	cp $(pwd)/${name}_couverture_analyse.bed.html $QUALITY/$name/
 	# Si analyse du fichier qualité
 	if [ $qualite = "OK" ]
