@@ -20,278 +20,286 @@ import json
 # Function
 
 # Initialisation du dictionnaire
-def initialize_dico():
-	"Initialise database and rename si un changement notable dans le pipeline est réalisé"
-	dico_database = {}
-	dico_database["Echantillon_patient"] = []
-	return(dico_database)
+def dictionnary_init():
+    """
+	Initialise database and rename if
+	if a significant change in the pipeline is made
+	"""
+    dict = {}
+    dict["patient_sample"] = []
+
+    return(dict)
 
 # Ecriture du dictionnaire
-def write_dictionnary(write_dico,name):
-	"""
-		Write Dictionnary in jsonformat
-	""" 
-	with open(name, 'w') as outfile:
-		json.dump(write_dico, outfile)
+def dictionnary_write(write_dico, name):
+    """
+    Writes the dictionnary in JSON formmat
+    """ 
+    with open(name, 'w') as outfile:
+        json.dump(write_dico, outfile)
 
 # Chargement du dictionnaire
-def load_dictionnary(name):
-	"""
-	load dictionnary 
-	"""
+def dictionnary_load(name):
+    """
+    Gets the dictionnary file name and loads it as a JSON
+    """
 
-	with open(name,"r") as infile:
+    with open(name,"r") as infile:
+        dict = json.load(infile)
 
-		dico_database = json.load(infile)
-	return(dico_database)
+    return(dict)
 
 # Insertion des valeurs dans le dictionnaire
-def Insertion_dictionnaire(dico_database,name_file):
-	"""
-		IN : Database
-		OUT: Dictionnaire with insertion of data
-	"""
+def dictionnary_insert(dict,name_file):
+    """
+        IN : Database
+        OUT: Dictionnary with insertion of data
+    """
 
-	# Preparation des elements pour bien ordonner le dictionnaire
-	# Partie "Patient"
-	liste_VAF = ["Mean_VAF","Method_Variant_GATK","Total_DP_GATK","VAF_GATK","Method_Variant_Mutect2","Total_DP_Mutect2","VAF_Mutect2","Method_Variant_Varscan","Total_DP_Varscan","VAF_Varscan","Method_Variant_Pindel","Total_DP_Pindel","VAF_Pindel"]
-	echantillon = name_file.split(".")[0].split("_")[3]
+    # Preparation des elements pour bien ordonner le dictionnaire
+    # Partie "Patient"
+    VAF = ["Mean_VAF","Method_Variant_GATK","Total_DP_GATK","VAF_GATK",
+	"Method_Variant_Mutect2","Total_DP_Mutect2","VAF_Mutect2",
+	"Method_Variant_Varscan","Total_DP_Varscan","VAF_Varscan",
+	"Method_Variant_Pindel","Total_DP_Pindel","VAF_Pindel"]
+    sample = name_file.split(".")[0].split("_")[3]
 
-	# Declaration du nom de l'echantillon
-	# Non ecriture de TEM HORIZON dans le dictionnaire == Passage de l'insertion
-	liste_exclure = ["TEM-HO","EEQ"]
-
-
-	if echantillon.startswith(liste_exclure[0]) or echantillon.startswith(liste_exclure[1]):
-		print('No match echantillon of control',echantillon)
-		sys.exit(0)
-	else:
-		print("Nom de l echantillon en cours d insertion du dictionnaire : " , echantillon)
+    # Declaration du nom de l'sample
+    # Non ecriture de TEM HORIZON dans le dictionnaire == Passage de l'insertion
+    liste_exclure = ["TEM-HO","EEQ"]
 
 
-	liste_patient = ['0409-GJ-09112010','0422-RC-19072006',"0013-SJ-30092010","0025-CR-13012010","0034-GA-29102009",
-					"0083-WP-07012011","0161-WF-07102011","0165-ND-30062011","0224-BC-10062009","0737-KJ-16112011",
-					"0113-GM-17092013","0117-GP-25012010","0294-CR-14112008","0041-LB-21032011","0628-BJ-07062016",
-					"0859-DG-16042015"]
-	if echantillon in liste_patient:
-		print("Patient à repasser")
-		sys.exit(0)
-	# Ecriture dans le dictionnaire
-	if echantillon not in dico_database["Echantillon_patient"]:
-		dico_database["Echantillon_patient"].append(echantillon)
-	# Lecture du fichier d'entrée d'annotation 
-	with open(name_file,"r+") as file_annotation:
-		# Action sur les lignes
-		for ligne in file_annotation:
-			# Si la ligne ne correspond pas au header
-			if ligne[0:2] != "ID":
-				# Récupération de ID du variant
-				info=ligne.split(";")
-				ID= info[0]
-				# Nouveau variant identifié qui n'est pas un témoin horizon
-				if ID not in dico_database:
-					# Création d'un sous dictionnaire
-					dico_database[ID] = {}
-					# Sous dictionnaire pour un patient
-					dico_database[ID][echantillon] = {}
-					# Stockage de la liste des échantillons ayant cet ID
-					dico_database[ID]["Liste_patient_ID"] = []
-					dico_database[ID]["Liste_patient_ID"].append(echantillon)
-					# Stockage de l'annotation information générale
-					dico_database[ID]["Annotation"] = {}
-					# Ecriture dans le dictionnaire
-					i = 1
-					while i < len(header):	
-						nom_attribut = header[i]
-						value = info[i]
-						# Element ID à la base de ce sous dictionnaire
-						if nom_attribut == "ID":
-							continue
-						# Insertion des valeurs de VAF
-						elif nom_attribut in liste_VAF:
-							dico_database[ID][echantillon][nom_attribut] = value
-						# Insertion des valeurs d'Annotation
-						else:	
-							dico_database[ID]["Annotation"][nom_attribut] = value
-						i+=1
-				
-				# Implementation de valeur d'un patient pour un ID reconnu
-				elif ID in dico_database and echantillon not in dico_database[ID]["Liste_patient_ID"] :
-					dico_database[ID][echantillon]= {}
-					dico_database[ID]["Liste_patient_ID"].append(echantillon)
-					i = 1
-					# Ecriture seulement des VAF pour chaque patient
-					while i < len(header):
-						nom_attribut = header[i]
-						value = info[i]
-						# Insertion des valeurs de VAF pour le patient
-						if nom_attribut in liste_VAF:
-							dico_database[ID][echantillon][nom_attribut] = value
-						i+=1
-				
-				# ID déja connu pour ce patient: Signalement
-				elif ID in dico_database and echantillon in dico_database[ID]["Liste_patient_ID"] :
-					print("Ce patient {:20s} et cet ID {:20s} a déja été stocké.".format(echantillon,ID))
+    if sample.startswith(liste_exclure[0]) or sample.startswith(liste_exclure[1]):
+        print('No match sample of control',sample)
+        sys.exit(0)
+    else:
+        print("Nom de l sample en cours d insertion du dictionnaire : " , sample)
 
-				# Other error to understand
-				else :
-					print("Other error")
-					sys.exit(1)
-			# Recuperation du header du tableau
-			else:
-				header = ligne.split(";")
 
-	return(dico_database)
+    patients = ['0409-GJ-09112010','0422-RC-19072006',"0013-SJ-30092010","0025-CR-13012010","0034-GA-29102009",
+                    "0083-WP-07012011","0161-WF-07102011","0165-ND-30062011","0224-BC-10062009","0737-KJ-16112011",
+                    "0113-GM-17092013","0117-GP-25012010","0294-CR-14112008","0041-LB-21032011","0628-BJ-07062016",
+                    "0859-DG-16042015"]
+    if sample in patients:
+        print("Patient à repasser")
+        sys.exit(0)
+    # Case of a patient not in dictionnary
+    if sample not in dict["patient_sample"]:
+        dict["patient_sample"].append(sample)
+    # Reading the input file
+    with open(name_file,"r+") as annotation:
 
-# Statistic sur le dictionnaire
-def statistic(dico_database,out):
-	# filout CSV of statistic
-	# Mise en place Tabulation
-	# liste patient to remove
-	"""
-		IN: Dictionnaire
-		OUT: Ecriture des informations principales dans un fichier
-	"""
-	liste_patient = ['0409-GJ-09112010','0422-RC-19072006',"0013-SJ-30092010","0025-CR-13012010","0034-GA-29102009",
-					"0083-WP-07012011","0161-WF-07102011","0165-ND-30062011","0224-BC-10062009","0737-KJ-16112011",
-					"0113-GM-17092013","0117-GP-25012010","0294-CR-14112008","0041-LB-21032011","0628-BJ-07062016",
-					"0859-DG-16042015"]
-	tab = "\t" 
-	with open(out,"w") as stat_out:
-		
-		print(" Patient",dico_database["Echantillon_patient"])
+        for line in annotation:
+			# If the line does not match the header
+            if line[0:2] != "ID":
+                # Getting variant ID
+                info=line.split(";")
+                ID=info[0]
+				# Case of a new variant that is not a horizon control
+                if ID not in dict:
+                    # Creating a sub-dictionnary
+                    dict[ID] = {}
+                    # Creating a value-key for each patient with the new ID key
+                    dict[ID][sample] = {}
+                    # Getting each sample with a matching ID
+                    dict[ID]["patient_IDs"] = []
+                    dict[ID]["patient_IDs"].append(sample)
+                    # Getting new information 
+                    dict[ID]["Annotation"] = {}
+                    # Ecriture dans le dictionnaire
+                    i = 1
+                    while i < len(header):    
+                        attribute = header[i]
+                        value = info[i]
+                        # Element ID à la base de ce sous dictionnaire
+                        if attribute == "ID":
+                            continue
+                        # Insertion des valeurs de VAF
+                        elif attribute in VAF:
+                            dict[ID][sample][attribute] = value
+                        # Insertion des valeurs d'Annotation
+                        else:    
+                            dict[ID]["Annotation"][attribute] = value
+                        i+=1
+                
+                # Implementation de valeur d'un patient pour un ID reconnu
+                elif ID in dict and sample not in dict[ID]["patient_IDs"] :
+                    dict[ID][sample]= {}
+                    dict[ID]["patient_IDs"].append(sample)
+                    i = 1
+                    # Ecriture seulement des VAF pour chaque patient
+                    while i < len(header):
+                        attribute = header[i]
+                        value = info[i]
+                        # Insertion des valeurs de VAF pour le patient
+                        if attribute in VAF:
+                            dict[ID][sample][attribute] = value
+                        i+=1
+                
+                # ID déja connu pour ce patient: Signalement
+                elif ID in dict and sample in dict[ID]["patient_IDs"] :
+                    print("Ce patient {:20s} et cet ID {:20s} a déja été stocké.".format(sample,ID))
 
-		count_total = len(dico_database["Echantillon_patient"])
-		print("Number Patient",count_total) 
-		# Mutation par gene 
-		stat_out.write("ID\tGene\tIGV\tcytoBand\tFreq\tPatient\tRedondance\tExonicFunc\t Notation\n")
+                # Other error to understand
+                else :
+                    print("Other error")
+                    sys.exit(1)
+            # Recuperation du header du tableau
+            else:
+                header = line.split(";")
 
-		# variable temporaire pour voir s'il y a aucun doublon d'echantillon
-		tmp = 0
-		# suppression de patient à ne pas prendre en compte
-		dico_database["Echantillon_patient"] = [i for i in dico_database["Echantillon_patient"] if i not in liste_patient]
-	 
-		# Search in dictionnary
-		for cle in sorted(dico_database.keys()):
-			
-			# Suppression des fichiers doublons
-			if tmp == cle:
-				print("Error of duplication ID")
-				sys.exit(1)
-			# Si c'est bien un variant	
-			if cle.startswith("chr") == True:
-				tmp = cle
-				# Afficher l'information sur un variant
-				#if cle == "chr17_74732935_CGGCGGCTGTGGTGTGAGTCCGGGG_C":
-				#	print(dico_database[cle])
-				
-				# Si la cle n'est pas vide
-				if len(dico_database[cle]["Liste_patient_ID"]) > 0:
-					# Suppresion ID du patient
-					dico_database[cle]["Liste_patient_ID"] = [i for i in dico_database[cle]["Liste_patient_ID"] if i not in liste_patient]
-					for echantillon in liste_patient: 
-						if echantillon in dico_database[cle]:
-							# Suppression des echantillons
-							del dico_database[cle][echantillon]	
-						
+    return(dict)
 
-					# Operation in dictionnary
-					countID = len(dico_database[cle]["Liste_patient_ID"])
-					freq_ID = round(float(len(dico_database[cle]["Liste_patient_ID"]) / count_total),4)
-					if freq_ID > 0.90:
-						Note_freq = "Always-Artefact"
-					elif freq_ID > 0.70 and freq_ID <= 0.90:
-						Note_freq = "Often"
-					elif freq_ID <= 0.70 and freq_ID > 0.40:
-						Note_freq = "Usually"
-					elif freq_ID <= 0.40 and freq_ID >= 0.10:
-						Note_freq = "Sometimes"
-					else:
-						Note_freq = "Rarely"
-				# Détermination des patients ayant cet ID
-					line_patient = ""
-					for patient in dico_database[cle]["Liste_patient_ID"]:
-						if line_patient != "":
-							line_patient = line_patient + "," + patient
-						# First line
-						else:
-							line_patient = line_patient + patient
-					line = cle + tab + str(dico_database[cle]["Annotation"]["Gene.refGene"]) + tab + str(dico_database[cle]["Annotation"]["IGV"]) + tab \
-					+ str(dico_database[cle]["Annotation"]["cytoBand"]) + tab  + str(freq_ID) + tab + line_patient + tab \
-					+ Note_freq + tab + str(dico_database[cle]["Annotation"]["ExonicFunc.refGene"]) + tab + str(dico_database[cle]["Annotation"]["AAChange.refGene"]) + "\n" 
-					stat_out.write(line)
-					
-					
-	return(dico_database)
+# Statistics on the dictionnary
+def statistic(dict,out):
+    # outptu file: CSV of statistic
+    # Setting tabs
+    # patients to remove
+    """
+        IN: Dictionnary
+        OUT: Output file with main informations
+    """
+    patients = ['0409-GJ-09112010','0422-RC-19072006',"0013-SJ-30092010","0025-CR-13012010","0034-GA-29102009",
+                    "0083-WP-07012011","0161-WF-07102011","0165-ND-30062011","0224-BC-10062009","0737-KJ-16112011",
+                    "0113-GM-17092013","0117-GP-25012010","0294-CR-14112008","0041-LB-21032011","0628-BJ-07062016",
+                    "0859-DG-16042015"]
+    tab = "\t" 
+    with open(out,"w") as stat_out:
+        
+        print(" Patient",dict["patient_sample"])
+
+        count_total = len(dict["patient_sample"])
+        print("Number Patient", count_total) 
+        # Mutation per gene
+        stat_out.write("ID\tGene\tIGV\tcytoBand\tFreq\tPatient\tRedundancy\tExonicFunc\tNotation\n")
+
+        # Temporary variable to spot double entries
+        tmp = 0
+        # Deleting partient; do not take into account
+        dict["patient_sample"] = [i for i in dict["patient_sample"] if i not in patients]
+
+        # Search in dictionnary
+        for key in sorted(dict.keys()):
+            
+            # Double entry delete
+            if tmp == key:
+                print("ERROR : duplicated ID")
+                sys.exit(1)
+            # If it is a variant    
+            if key.startswith("chr") == True:
+                tmp = key
+				# Get variant information
+                #if key == "chr17_74732935_CGGCGGCTGTGGTGTGAGTCCGGGG_C":
+                #    print(dict[key])
+                
+                # If the key is valid
+                if len(dict[key]["patient_IDs"]) > 0:
+                    # Deleting patient ID 
+                    dict[key]["patient_IDs"] = [i for i in dict[key]["patient_IDs"] if i not in patients]
+                    for sample in patients: 
+                        if sample in dict[key]:
+                            # Deleting samples
+                            del dict[key][sample]    
+
+                    # Operation in dictionnary
+                    countID = len(dict[key]["patient_IDs"])
+                    freq_ID = round(float(len(dict[key]["patient_IDs"]) / count_total),4)
+                    if freq_ID > 0.90:
+                        Note_freq = "Always-Artefact"
+                    elif freq_ID > 0.70 and freq_ID <= 0.90:
+                        Note_freq = "Often"
+                    elif freq_ID <= 0.70 and freq_ID > 0.40:
+                        Note_freq = "Usually"
+                    elif freq_ID <= 0.40 and freq_ID >= 0.10:
+                        Note_freq = "Sometimes"
+                    else:
+                        Note_freq = "Rarely"
+                # Getting patients with this ID
+                    line_patient = ""
+                    for patient in dict[key]["patient_IDs"]:
+                        if line_patient != "":
+                            line_patient = line_patient + "," + patient
+                        # First line
+                        else:
+                            line_patient = line_patient + patient
+                    line = key + tab + str(dict[key]["Annotation"]["Gene.refGene"]) + tab + str(dict[key]["Annotation"]["IGV"]) + tab \
+                    + str(dict[key]["Annotation"]["cytoBand"]) + tab  + str(freq_ID) + tab + line_patient + tab \
+                    + Note_freq + tab + str(dict[key]["Annotation"]["ExonicFunc.refGene"]) + tab + str(dict[key]["Annotation"]["AAChange.refGene"]) + "\n" 
+                    stat_out.write(line)
+                    
+                    
+    return(dict)
 
 # *****************************************************
 # ********************* Main **************************
 # *****************************************************
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(prog="database_dictionnary_v2")
-	# Create sub_parsers (one for Treatment_Annotation, other for Combine)
-	
-	parser.add_argument("-d", "--directory",
-		dest="directory",
-		required=False,
-		type=str,
-		help="Directory of result annotation"
-	)
-	parser.add_argument("-f", "--fileresult",
-		dest="file",
-		required=False,
-		type=str,
-		help="File of result annotation for annovar fusion"
-	)
-	parser.add_argument("-o", "--outout",
-		dest="out",
-		required=True,
-		type=str,
-		help="Name of new dictionnary and his location"
-	)
-	parser.add_argument("-c", "--newdictionnary",
-		dest="dictionnary",
-		required=False,
-		type=bool,
-		help="Argument to indicate creation of new dictionnary -c TRUE sinon ne pas afficher cette option"
-	)
-	parser.add_argument("-s", "--statistic",
-		dest="stat",
-		required=False,
-		type=bool,
-		help="Argument to activate statistic option"
-	)
-	parser.add_argument("-outstat", "--outstatistic",
-		dest="outstat",
-		required=False,
-		type=str,
-		help="Argument to indicate fileout of statistic csv"
-	)
-	args = parser.parse_args()
-	# Si args.dictionnary == TRUE : Initialisation du dictionnnaire
-	if args.dictionnary:
-		
-		#initialisation dictionnaire si un changement notable dans le pipeline est réalisé
-		dico_database = initialize_dico()
-	# Sinon chargement du dictionnaire	
-	else:
-		# Load dictionnary
-		dico_database = load_dictionnary(args.out)
-		
-	# if args.stat == True Statistic on dictionnary
-	if args.stat:
-		# Appel de la fonction statistic
-		dico = statistic(dico_database,args.outstat)
-		# Ecriture des changements suite à d'éventuel suppression
-		write_dictionnary(dico,args.out)
-	# Insertion value in dictionnary	
-	else:
-		# Deplacement dans le repertoire
-		os.chdir(args.directory)
-		dico = Insertion_dictionnaire(dico_database,args.file)
-		# Save new dictionnary
-		write_dictionnary(dico,args.out)
-		print("L'insertion des données {:20s} dans la database s'est bien déroulée.".format(args.file))
-	
-	
-	sys.exit(0)
+    parser = argparse.ArgumentParser(prog="database_dictionnary_v2")
+    # Create sub_parsers (one for Treatment_Annotation, other for Combine)
+    
+    parser.add_argument("-d", "--directory",
+        dest="directory",
+        required=False,
+        type=str,
+        help="Directory of result annotation"
+    )
+    parser.add_argument("-f", "--fileresult",
+        dest="file",
+        required=False,
+        type=str,
+        help="File of result annotation for annovar fusion"
+    )
+    parser.add_argument("-o", "--outout",
+        dest="out",
+        required=True,
+        type=str,
+        help="Name of new dictionnary and its location"
+    )
+    parser.add_argument("-c", "--newdictionnary",
+        dest="dictionnary",
+        required=False,
+        type=bool,
+        help="""Argument to indicate creation of new dictionnary 
+                -c TRUE to trigger new dictionary creation 
+                False by default
+            """
+    )
+    parser.add_argument("-s", "--statistic",
+        dest="stat",
+        required=False,
+        type=bool,
+        help="Argument to activate statistic option"
+    )
+    parser.add_argument("-outstat", "--outstatistic",
+        dest="outstat",
+        required=False,
+        type=str,
+        help="Argument to indicate fileout of statistic csv"
+    )
+    args = parser.parse_args()
+	# If the args.dictionnary parameter is TRUE, the dictionnary is initialised
+    if args.dictionnary:
+        # If some notable change is made on the pipeline, run this command
+        dict = dictionnary_init()
+    # If the dictionnary needs no update, it is loaded
+    else:
+        # Load dictionnary
+        dict = dictionnary_load(args.out)
+        
+    # if args.stat == True Statistic on dictionnary
+    if args.stat:
+    # Calling statistics funtion
+        dico = statistic(dict,args.outstat)
+		# Writing changes following a database element deletion
+        dictionnary_write(dico,args.out)
+    # Inserting values in the dictionnary  
+    else:
+        # Deplacement dans le repertoire
+        os.chdir(args.directory)
+        dico = dictionnary_insert(dict,args.file)
+        # Save new dictionnary
+        dictionnary_write(dico,args.out)
+        print("Data insertion ({:20s}) in the database went well.".format(args.file))
+    
+    
+    sys.exit(0)

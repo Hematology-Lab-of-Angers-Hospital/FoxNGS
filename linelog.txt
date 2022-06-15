@@ -1,0 +1,17 @@
+^\s*#\s*.*$
+>{1,2}\s\$LOG|_FILE$
+
+Total script (code+commentaires) : 1008 lignes
+
+Recherche de commentaires par regex -> 254 lignes
+Total code (script-commentaires): 754 lignes
+Pourcentage de commentaires: ~25%
+
+
+Recherche de versement au log par regex -> 179 lignes
+
+Total script sans logging: 829 lignes
+Total code sans logging -> 575 lignes
+
+Pourcentage de logging dans le script -> ~18%
+Pourcentage de logging dans code -> ~23%

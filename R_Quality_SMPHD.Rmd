@@ -152,7 +152,3 @@ ggplot(bed1bis,aes(x=factor(V8),fill=V7,label=V7, stat = "identity"))+ geom_bar(
   theme_classic()+xlab("")+ylab("")+labs(fill="Profondeur (X)")
 
 ```
-
-
-
-
