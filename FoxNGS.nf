@@ -4,7 +4,7 @@ bcl2fastq -> fastq
 
 process qualityControl {
     input:
-    file fastq from fastqChannel
+    path fastq from fastqChannel
 
     output:
     publishDir "${params.outDir}/QC", mode: 'copy'
@@ -16,10 +16,25 @@ process qualityControl {
 
 }
 
+process buildIndex {
+    publishDir "${params.publish_dir}/"
+
+    input:
+    path
+
+    output:
+    path sam_filt into samChannel
+
+    script:
+    """
+    bwa mem -t params.bwa.index.threads -R params.bwa.index.header $reference_genome $fastq_r1 $fastq_r2 > sam_file
+    """
+}
+
 proccess bamSetup {
 
 }
-bwa mem
+
 samtools view
 samtools sort
 samtools index
@@ -33,7 +48,10 @@ samtools index -> sort.dupmark.bam
 
 process qCReport {
     input:
-    file bam from bamChannel
+    path bam from bamChannel
+
+    output:
+    path qc_report into ???
 }
 
 bedtools coverage > cover_analysis

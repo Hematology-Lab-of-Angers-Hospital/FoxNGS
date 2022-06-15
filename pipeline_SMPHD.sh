@@ -351,7 +351,7 @@ function FASTQ_SETUP () {
 	date >> $LOG
 	echo "start de bcl2fastq" >> $LOG
 	echo -e "bcl2fastq --runfolder $BCL --output-dir $DIRECTORY/ --sample-sheet $TPL --use-bases-mask Y150,I8,I8,Y150 --no-lane-splitting -r 16 -p 16 -w 16" >> $LOG
-	 
+
 	echo "fin de bcl2fastq" >> $LOG
 	date >> $LOG
 	echo -e "**********************************************************************\n" >> $LOG
