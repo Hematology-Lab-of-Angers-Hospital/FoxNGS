@@ -1,0 +1,12 @@
+.nextflow*
+
+data/*
+inputs/*
+output/*
+results/*
+work/*
+pipeline_*
+timeline.html*
+report.html*
+
+dump.nf
