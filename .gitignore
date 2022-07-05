@@ -1,6 +1,7 @@
 .nextflow*
 
 data/*
+tools/*
 inputs/*
 output/*
 results/*
@@ -8,5 +9,6 @@ work/*
 pipeline_*
 timeline.html*
 report.html*
+flowchart.html*
 
 dump.nf
