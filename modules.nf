@@ -167,6 +167,7 @@ OUTPUT INTO
 }
 
 process SAM_SETUP {
+    cpus 4
 /*
 Sets up the sam file by calling bwa mem to align the fastq on 
 the reference genome.
