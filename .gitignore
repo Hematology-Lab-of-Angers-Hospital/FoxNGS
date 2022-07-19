@@ -7,9 +7,11 @@ output/*
 results/*
 work/*
 pipeline_*
+
 timeline.html*
 report.html*
 flowchart.html*
 diagram.html*
 
+linelog.txt
 dump.nf
