@@ -68,7 +68,7 @@ process FAI_SETUP {
 Runs samtools faidx to make the reference genome index (.fai file)
 if that is necessary
 
-TIP: This process is not as long as INDEX_SETUP but the pipeline has parameters
+TIP: This process is not as long as REFERENCE_INDEX_SETUP but the pipeline has parameters
 to fetch the .fai file from the data/reference folder; consider copying the
 .fai output file and set param.indexed_genome to 'true' to skip this step.
 
@@ -97,11 +97,12 @@ OUTPUT INTO
 }
 
 process REFERENCE_DICT_SETUP {
+    cpus 2
 /*
 Runs samtools faidx to make the reference genome index (.fai file)
 if that is necessary
 
-TIP: This process is not as long as INDEX_SETUP but the pipeline has parameters
+TIP: This process is not as long as REFERENCE_INDEX_SETUP but the pipeline has parameters
 to fetch the .fai file from the data/reference folder; consider copying the
 .fai output file and set param.indexed_genome to 'true' to skip this step.
 
@@ -132,7 +133,7 @@ OUTPUT INTO
     """
 }
 
-process INDEX_SETUP {
+process REFERENCE_INDEX_SETUP {
 /*
 Runs bwa index on the reference genome
 
@@ -166,13 +167,45 @@ OUTPUT INTO
     """
 }
 
+process VARIATION_INDEX_SETUP {
+    cpus 2
+/*
+process description
+
+INPUT
+    <
+    <
+
+OUTPUT
+    >
+
+INPUT FROM
+    <-
+
+OUTPUT INTO
+    ->
+*/
+
+    input:
+    path(gatk)
+    path(dbsnp)
+
+    output:
+    path('*.idx')
+
+    script:
+    """
+    java -jar ${gatk} IndexFeatureFile -I ${dbsnp}
+    """
+}
+
 process SAM_SETUP {
     cpus 4
 /*
 Sets up the sam file by calling bwa mem to align the fastq on 
 the reference genome.
 If the path to index files has not been passed to parameters or the index files
-are absent, the pipeline builds the index files with the INDEX_SETUP beforehand
+are absent, the pipeline builds the index files with the REFERENCE_INDEX_SETUP beforehand
 
 INPUTS
 (linked)
@@ -197,7 +230,7 @@ INPUT FROM
     reference_index channel 
         if the reference genome has already been indexed)
     OR
-    INDEX_SETUP process
+    REFERENCE_INDEX_SETUP process
         (if the genome index files are not found)
 
     <- sampleId,fastq_r!,fastq_r2: setup_reads channel
@@ -220,6 +253,7 @@ OUTPUT INTO
 }
 
 process BAM_SETUP {
+    cpus 4
 /*
 Sets up the bam (binary ve
 
@@ -252,15 +286,19 @@ OUTPUT INTO
     script:
     """
     samtools view -@ $task.cpus -Sh ${sampleId}.sam -bo ${sampleId}.bam
+
     samtools sort -@ $task.cpus ${sampleId}.bam -o ${sampleId}_sorted.bam
 
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
+
     unmapped_reads=`samtools view -f 0x4 -h -@ $task.cpus -c -b ${sampleId}_sorted.bam`
+
     chimeric_reads=`samtools view  -f 0x800 -h -@ $task.cpus -c -b ${sampleId}_sorted.bam`
     """
 }
 
 process BAM_MAPPING {
+    cpus 4
 /*
 Filters the reads not mapped to the reference genome (ox4 tag) with samtools 
 Sets up the bam index (bai) with samtools index
@@ -292,11 +330,13 @@ OUTPUT INTO
     script:
     """
     samtools view -F ox4 -h -@ $task.cpus -b ${sampleId}_sorted.bam > ${sampleId}_mapped_sorted.bam
+
     samtools index -@ $task.cpus ${sampleId}_mapped_sorted.bam > ${sampleId}_mapped_sorted.bam.bai
     """
 }
 
 process ON_TARGET_MAPPING {
+    cpus 2
 /*
 
 
@@ -332,11 +372,13 @@ OUTPUT INTO
     script:
     """
     bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_hemato} > ${sampleId}_on_target.bam
+
     samtools index -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_on_target.bam.bai
     """
 }
 
 process DUPMARK_BAM_SETUP {
+    cpus 4
 /*
 Uses picard to filter duplicates in the on_target bam file
 
@@ -373,11 +415,13 @@ OUTPUT INTO
     script:
     """
     java -jar ${picard} MarkDuplicates -I ${sampleId}_on_target.bam -M ${sampleId}.marked_dup.metrics.txt -O ${sampleId}_dupmark.bam
+    
     samtools index -@ $task.cpus ${sampleId}_dupmark.bam > ${sampleId}_dupmark.bam.bai
     """
 }
 
 process COVERAGE_ANALYSIS {
+    cpus 2
 /*
 Uses samtools make a coverage analysis
     - Mapped reads on reference genome
@@ -443,15 +487,20 @@ OUTPUT INTO
     script:
     """
     samtools coverage ${sampleId}_mapped_sorted.bam -m > ${sampleId}_coverage.bed
+
     samtools coverage ${sampleId}_on_target.bam -m > ${sampleId}_on_target.bed
+
     samtools flagstat -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_bam_sort_stats
+
     bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_hemato} -v > ${sampleId}_off_target.bam
+    
     bedtools coverage -a ${bed_exon} -b ${sampleId}_dupmark.bam -d > ${sampleId}_coverage
     """
 //    R -e "rmarkdown::render('${report_rscript}', params = list(file='coverage',user='${USER}',pipeline='FoxNGS V1.0A',output='statistics_coverage.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),output_file='${sampleId}_couverture_analyse.bed.html')"
 }
 
 process VARSCAN {
+    cpus 2
 /*
 process description
 
@@ -470,7 +519,9 @@ OUTPUT
     > mutect2.vcf: variant call format (vcf) file from the mutect2 software
 
 INPUT FROM
-    <-
+    <- sampleId, dupmark.bam, dupmark.bai: DUPMARK_BAM_SETUP process
+    <- reference_genome                  : reference_genome channel
+    <- varscan                           : varscan channel
 
 OUTPUT INTO
     ->
@@ -481,20 +532,24 @@ OUTPUT INTO
         path(varscan)
 
     output:
-        path("${sampleId}_varscan.vcf")
+        tuple val(sampleId), path("${sampleId}_varscan.vcf")
 
     script:
     """
-    samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o mpileup
-    java -jar ${varscan} mpileup2cns mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > ${sampleId}_varscan.vcf
+    samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
+
+    java -jar ${varscan} mpileup2cns ${sampleId}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > ${sampleId}_varscan.vcf
     """
 }
 
+
 process MUTECT2 {
+    cpus 2
 /*
 process description
 
 INPUT
+    < gatk            : path to the GATK toolkit java archive (.jar) file
     (linked)
     < sampleId        : patient ID value
     < dupmark.bam     : path to binary mapped reads that are sorted, 
@@ -503,7 +558,6 @@ INPUT
 
     < reference_genome: path to the reference genome (.fna file)
     < indexed genome  : path to the reference genome index (.fna.fai file)
-    < gatk            : path to the GATK toolkit java archive (.jar) file
 
 OUTPUT
     > mutect2.vcf: variant call format (vcf) file from the mutect2 software
@@ -515,28 +569,31 @@ OUTPUT INTO
     ->
 */
     input:
+        path(gatk)
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
         path(reference_genome)
         path(indexed_genome)
         path(reference_dict)
-        path(gatk)
 
     output:
-        path("${sampleId}_mutect2.vcf")
+        tuple val(sampleId), path("${sampleId}_mutect2.vcf")
 
     script:
     """
-	java -jar ${gatk} Mutect2 -R ${reference_genome} -I ${sampleId}_dupmark.bam --min-base-quality-score 30 --dont-use-soft-clipped-bases true --native-pair-hmm-threads $task.cpus -O ${sampleId}_mutect2.vcf.gz
+	java -jar ${gatk} Mutect2 -I ${sampleId}_dupmark.bam -R ${reference_genome} --min-base-quality-score 30 --dont-use-soft-clipped-bases true --native-pair-hmm-threads $task.cpus -O ${sampleId}_mutect2.vcf.gz
+    
     gunzip ${sampleId}_mutect2.vcf.gz
     """
 }
 
 
 process HAPLOTYPECALLER {
+    cpus 2
 /*
 process description
 
 INPUT
+    < gatk            : path to the GATK toolkit java archive (.jar) file
     (linked)
     < sampleId        : patient ID value
     < dupmark.bam     : path to binary mapped reads that are sorted, 
@@ -546,7 +603,6 @@ INPUT
     < dbsnp           : path to the dbsnp archive of human signe nucleotide 
                         variations and associated annotations 
     < reference_genome: path to the reference genome (.fna file)
-    < gatk            : path to the GATK toolkit java archive (.jar) file
 
 OUTPUT
     > haplotypecaller.vcf: variant call format (vcf) file from the 
@@ -562,13 +618,16 @@ OUTPUT INTO
     -> haplotypecaller.vcf: 
 */
     input:
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
-        path(dbsnp)
-        path(reference_genome)
         path(gatk)
+        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        path(reference_genome)
+        path(indexed_genome)
+        path(reference_dict)
+        path(dbsnp)
+        path(dbsnp_idx)
 
     output:
-        path("${sampleId}_haplotypecaller.vcf")
+        tuple val(sampleId), path("${sampleId}_haplotypecaller.vcf")
 
     script:
         """
@@ -582,58 +641,110 @@ OUTPUT INTO
         java -jar ${gatk} ApplyBQSR \
             -I ${sampleId}_dupmark.bam \
             -R ${reference_genome} \
-            -bqsr ${sampleId}_recal.table s\
+            -bqsr ${sampleId}_recal.table \
             -O ${sampleId}_bqsr.bam
 
 
         java -jar ${gatk} HaplotypeCaller  \
             -I ${sampleId}_bqsr.bam \
             -R ${reference_genome} \
-            --native-pair-hmm-threads $task.cpus \
             --min-base-quality-score 30 \
             --minimum-mapping-quality 20 \
-            --dont-use-soft-clipped-bases true
+            --dont-use-soft-clipped-bases true \
             -O ${sampleId}_haplotypecaller.vcf \
 
         awk '{gsub(",Date=[^>]+>",">");}1' ${sampleId}_haplotypecaller.vcf
         """
 }
 
-/*
 process PINDEL {
+/*
+process description
+
+INPUT
+    (linked)
+    <
+    <
+    <
+
+    <
+    <
+    <
+
+
+OUTPUT
+    >
+
+INPUT FROM
+    <-
+
+OUTPUT INTO
+    ->
+*/
+
     input:
-        tuple val(sampleId), path('dupmark.bam'), path(dupmark_bam.bai)
+        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
         path(reference_genome)
+        path(pindel)
         path(bed_pindel)
 
     output:
-        path('pindel.vcf')
+        tuple val(sampleId), path('pindel.vcf')
 
     script:
-        """
+    """
+    echo -e "${sampleId}_dupmark.bam 800 Duplicate_mark\n${sampleId}_sorted.bam 800 All_read" > config_file_pindel.txt
+    
+    ${pindel}/pindel -f ${reference_genome} -i config_file_pindel.txt -j ${bed_pindel} -T $task.cpus -o ${sampleId}_ITD
 
-        """
+	${pindel}/pindel2vcf -P ${sampleId}_ITD -r ${reference_genome} -R x -d 00000000 -G -v ${sampleId}_pindel.vcf
+    """
 }
-*/
 
+/*
 process ANNOVAR {
+
+process description
+
+INPUT
+    (linked)
+    <
+    <
+    <
+
+    <
+    <
+    <
+
+
+OUTPUT
+    >
+
+INPUT FROM
+    <-
+
+OUTPUT INTO
+    ->
+
     input:
-    path(vcf)
-    path(annovar)
-    path(humandb)
-    path(python_annot)
-    path(python_vcf_to_csv)
-    value()
+        val(reference_version)
+        path(vcf)
+        path(annovar)
+        path(humandb)
+        path(python_annot)
+        path(python_vcf_to_csv)
 
     output:
-    path(variant_table)
+        tuple val(sampleId), path(${sampleId}_processed_annotation.csv)
 
     script:
     """
-	${annovar}/table_annovar.pl ${vcf} ${annovar_db} -buildver hg${reference_version} -out annotated.vcf -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread $task.cpus -polish -vcfinput -xref ${annovar}/humandb/hg19_refGene.txt
+	${annovar}/table_annovar.pl ${vcf} ${annovar_db} -buildver hg${reference_version} -out ${sampleId}_annotated.vcf -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread $task.cpus -polish -vcfinput -xref ${annovar}/humandb/hg19_refGene.txt
 
-	python3 ${python_vcf_to_csv} -inVCF annotated.vcf -toType table -out variation_annotation.csv
+	python3 ${python_vcf_to_csv} -inVCF ${sampleId}_annotated.vcf -toType table -out ${sampleId}_variation_annotation.csv
 
-	python3 ${python_annot} -f variation_annotation.csv -o processed_annotation.csv -m ${method}
+	python3 ${python_annot} -f ${sampleId}_variation_annotation.csv -o ${sampleId}_processed_annotation.csv -m ${method}
     """
 }
+*/
