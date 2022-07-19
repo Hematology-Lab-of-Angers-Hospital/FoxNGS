@@ -60,7 +60,7 @@ include {
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
-    PINDEL;
+//    PINDEL;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
@@ -135,7 +135,7 @@ workflow {
     VARSCAN(DUPMARK_BAM_SETUP.out, reference_genome, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
-    PINDEL(DUPMARK_BAM_SETUP.out, BAM_MAPPING.out, reference_genome, pindel, bed_pindel)
+//    PINDEL(DUPMARK_BAM_SETUP.out, BAM_MAPPING.out, reference_genome, pindel, bed_pindel)
 
     // Variant annotation
 }
