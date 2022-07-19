@@ -10,5 +10,6 @@ pipeline_*
 timeline.html*
 report.html*
 flowchart.html*
+diagram.html*
 
 dump.nf
