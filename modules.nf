@@ -76,10 +76,10 @@ INPUT
     < reference_genome: path to the reference genome (.fna file)
 
 OUTPUT
-    > .fai genome index file
+    > path to the reference genome index (.fna.fai file)
 
 INPUT FROM 
-    <- reference_genome channel
+    <- reference_genome: reference_genome channel
 
 OUTPUT INTO
     -> indexed_genome channel
@@ -111,11 +111,11 @@ INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
 
 OUTPUT
-    > .dict genome dictionnnary file
+    > path to the reference genome dictionnary (.dict file)
 
 INPUT FROM 
-    <- reference_genome channel
-    <- gatk channel
+    <- reference_genome: reference_genome channel
+    <- gatk            : gatk channel
 
 OUTPUT INTO
     -> reference_dict channel
@@ -152,7 +152,7 @@ INPUT FROM
     <- reference_genome channel
 
 OUTPUT INTO
-    -> 
+    -> REFERENCE_INDEX_SETUP process (if make_index parameter is set on true)
 */
 
     input:
@@ -173,17 +173,18 @@ process VARIATION_INDEX_SETUP {
 process description
 
 INPUT
-    <
-    <
+    < gatk : 
+    < dbsnp: 
 
 OUTPUT
-    >
+    > path to the .idx dbsnp index file
 
 INPUT FROM
-    <-
+    <- gatk : gatk channel
+    <- dbsnp: dbsnp channel
 
 OUTPUT INTO
-    ->
+    -> HAPLOTYPECALLER process
 */
 
     input:
@@ -403,7 +404,7 @@ INPUT FROM
     <- picard                                  : picard channel    
 
 OUTPUT INTO
-    -> 
+    -> COVERAGE_ANALYSIS, VARSCAN, MUTECT2, HAPLOTYPECALLER, PINDEL processes
 */
     input:
         tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai") 
@@ -502,7 +503,8 @@ OUTPUT INTO
 process VARSCAN {
     cpus 2
 /*
-process description
+Calls genome variation in the .bam files (comparing it to the reference genome)
+using varscan
 
 INPUT
     (linked)
@@ -512,19 +514,21 @@ INPUT
     < dupmark.bai     : path to the dupmark bam index
 
     < reference_genome: path to the reference genome (.fna file)
-    < varscan         : path to the varscan software java archive (jar) file
+    < varscan         : path to the varscan software java archive (.jar) file
 
 
 OUTPUT
-    > mutect2.vcf: variant call format (vcf) file from the mutect2 software
+    (linked)
+    > sampleId   : patient ID value
+    > varscan.vcf: variant call format (.vcf) file from the varscan software
 
 INPUT FROM
-    <- sampleId, dupmark.bam, dupmark.bai: DUPMARK_BAM_SETUP process
-    <- reference_genome                  : reference_genome channel
-    <- varscan                           : varscan channel
+    <- sampleId,dupmark.bam,dupmark.bai: DUPMARK_BAM_SETUP process
+    <- reference_genome                : reference_genome channel
+    <- varscan                         : varscan channel
 
 OUTPUT INTO
-    ->
+    -> ANNOVAR process
 */
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -546,7 +550,8 @@ OUTPUT INTO
 process MUTECT2 {
     cpus 2
 /*
-process description
+Calls genome variation in the .bam files (comparing it to the reference genome)
+using Mutect2 from the GATK software suite
 
 INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
@@ -558,15 +563,21 @@ INPUT
 
     < reference_genome: path to the reference genome (.fna file)
     < indexed genome  : path to the reference genome index (.fna.fai file)
+    < reference_dict  : path to the reference genome dictionnary (.dict file)
 
 OUTPUT
-    > mutect2.vcf: variant call format (vcf) file from the mutect2 software
+    (linked)
+    > sampleId   : patient ID value
+    > mutect2.vcf: variant call format (.vcf) file from the mutect2 software
 
 INPUT FROM
-    <-
+    <- sampleId,dupmark.bam,dupmark.bam.bai: DUPMARK_BAM_SETUP process
+    <- reference_genome                    : reference_genome channel
+    <- indexed_genome                      : REFERENCE_INDEX_SETUP
+    <- reference_dict                      : REFERENCE_DICT_SETUP process
 
 OUTPUT INTO
-    ->
+    -> ANNOVAR process
 */
     input:
         path(gatk)
@@ -590,7 +601,11 @@ OUTPUT INTO
 process HAPLOTYPECALLER {
     cpus 2
 /*
-process description
+
+
+Calls genome variation in the .bam files (comparing it to the reference genome)
+using HaplotypeCaller from the GATK software suite. Uses dbsnp to filter SNP
+that are reported as non-pathogenic.
 
 INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
@@ -600,22 +615,30 @@ INPUT
                         off target reads filtered, with marked duplicates
     < dupmark.bai     : path to the dupmark bam index
 
-    < dbsnp           : path to the dbsnp archive of human signe nucleotide 
-                        variations and associated annotations 
     < reference_genome: path to the reference genome (.fna file)
+    < indexed_genome  : path to the reference genome index (.fna.fai file)
+    < reference_dict  : path to the reference genome dictionnary (.dict file)
+    < dbsnp           : path to the dbsnp archive of human signe nucleotide 
+                        variations and associated annotations
+    < dbsnp_idx       : path 
+
 
 OUTPUT
-    > haplotypecaller.vcf: variant call format (vcf) file from the 
-                            HaplotypeCaller function in the GATK toolkit
+    (linked)
+    > sampleId           : patient ID value
+    > haplotypecaller.vcf: variant call format (.vcf) file from the 
+                           HaplotypeCaller function in the GATK toolkit
 
 INPUT FROM
     <- sampleId, dupmark.bam, dupmark.bai: DUPMARK_BAM_SETUP process
-    <- dbsnp                             : dbsnp channel
     <- reference_genome                  : reference_genome channel
-    <- gatk                              : gatk channel
+    <- indexed_genome                    : FAI_SETUP process
+    <- reference_dict                    : REFERENCE_DICT_SETUP process
+    <- dbsnp                             : dbsnp channel
+    <- dbsnp_idx                         : VARIATION_INDEX_SETUP process
 
 OUTPUT INTO
-    -> haplotypecaller.vcf: 
+    -> ANNOVAR process
 */
     input:
         path(gatk)
@@ -659,27 +682,36 @@ OUTPUT INTO
 
 process PINDEL {
 /*
-process description
+Calls genome variation in the .bam files (comparing it to the reference genome)
+using pindel to find specific InDel in CALR and FLT3 (hence the bed input)
 
 INPUT
     (linked)
-    <
-    <
-    <
+    < sampleId             : patient ID value
+    < dupmark.bam          : path to binary mapped reads that are sorted, 
+                             off target reads filtered, with marked duplicates
+    < dupmark.bai          : path to the dupmark bam index
 
-    <
-    <
-    <
-
+    (linked)
+    > sampleId             : patient ID value
+    > mapped_sorted.bam    : path to file containing 
+                             the reads correctly mapped on the genome 
+    > mapped_sorted.bam.bai: path to the mapped_sorted_bam index
 
 OUTPUT
-    >
+    (linked)
+    > sampleId  : patient ID value
+    > pindel.vcf: variant call format (vcf) file from the pindel variant caller
 
 INPUT FROM
-    <-
+    <- sampleId, dupmark.bam, dupmark.bai            : DUPMARK_BAM_SETUP process
+    <- sampleId, mapped_sorted.bam, mapped_sorted.bai: BAM_MAPPING process
+    <- reference_genome                              : reference_genome channel
+    <- pindel                                        : pindel channel
+    <- bed_pindel                                    : bed_pindel channel
 
 OUTPUT INTO
-    ->
+    -> ANNOVAR process
 */
 
     input:
