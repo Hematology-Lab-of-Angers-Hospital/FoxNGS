@@ -4,23 +4,6 @@
 
 // ___PROCESSES___
 
-
-process FASTQ_SETUP {
-    input:
-        path(bcl)
-        path(singularity_image)
-        path(samplesheet)
-
-    output:
-        path()
-
-    script:
-    """
-    singularity exec ${singularity_image} bcl2fastq --runfolder ${bcl_runfolder} --output-dir $REPERTORY/ --sample-sheet ${samplesheet} --use-bases-mask Y151,I8,I8,Y151 --no-lane-splitting -r $task.cpus -p $task.cpus -w $task.cpus
-    """
-}
-
-
 process QUALITY_CONTROL {
 /*
 Runs FastQC on fastq input to check read quality
@@ -32,12 +15,15 @@ WARNING: This quality control step will NOT stop the analysis
     other analysis result
 
 INPUT
+    < sampleId             : patient ID value
     < fastq_r1 and fastq_r2: NGS reads 
         (both files if doing paired-end, only fastq_r1 if doing single-end)
 
 OUTPUT
-    > QC report file in the 
-        (.html files in the 'QC' folder of the patient directory)
+    (linked)
+    > sampleId          : patient ID value
+    > R1_001.fastqc.html: quality control metrics web page for the first end of paired-end reads
+    > R2_001.fastqc.html: quality control metrics web page for the other end of paired-end reads
 
 INPUT FROM
     <- setup_paired_end_reads channel
@@ -46,20 +32,17 @@ OUTPUT INTO
     -> results/$patient_id/QC directory
 */
     cpus 2
-    publishDir "$params.results/$sampleId/QC", mode: 'copy'
+    publishDir "${params.results}/${sampleId}/QC", mode: 'copy'
 
     input:
         tuple val(sampleId), path(fastq_r1), path(fastq_r2)
 
     output:
-        path '*'
+        path('*')
 
     script:
     """
-    fastqc \
-        -t ${task.cpus} \
-        ${fastq_r1} \ 
-        ${fastq_r2}
+    fastqc -t ${task.cpus} ${fastq_r1} ${fastq_r2}
     """
 }
 
@@ -79,7 +62,7 @@ OUTPUT
     > path to the reference genome index (.fna.fai file)
 
 INPUT FROM 
-    <- reference_genome: reference_genome channel
+    <- reference_genome channel
 
 OUTPUT INTO
     -> indexed_genome channel
@@ -97,7 +80,6 @@ OUTPUT INTO
 }
 
 process REFERENCE_DICT_SETUP {
-    cpus 2
 /*
 Runs samtools faidx to make the reference genome index (.fai file)
 if that is necessary
@@ -111,15 +93,17 @@ INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
 
 OUTPUT
-    > path to the reference genome dictionnary (.dict file)
+    > path to the reference genome dictionary (.dict file)
 
 INPUT FROM 
-    <- reference_genome: reference_genome channel
-    <- gatk            : gatk channel
+    <- reference_genome: reference_genome value channel
+    <- gatk            : gatk value channel
 
 OUTPUT INTO
     -> reference_dict channel
 */
+    cpus 2
+
     input:
         path(gatk)
         path(reference_genome)
@@ -130,6 +114,46 @@ OUTPUT INTO
     script:
     """
     java -jar ${gatk} CreateSequenceDictionary -R ${reference_genome}
+    """
+}
+
+process BED_INTERVAL_SETUP {
+/*
+Uses the Picard BedToInterval function to convert a bed file 
+to an interval list that serves an an input for the CollectHsMetrics in Picard 
+
+INPUT
+    < picard        : path to the Picard java archive file (.jar)
+    < bed           : path to a bed file
+    < reference_dict: path to the reference genome dictionary (.dict file)
+
+
+OUTPUT
+    > path to the bed converted to an interval list
+
+INPUT FROM
+    <- picard        : picard value channel
+    <- bed           : bed_exon OR bed_bait value channel
+    <- reference_dict: REFERENCE_DICT_SETUP process
+
+OUTPUT INTO
+    -> 
+*/
+    input:
+        path(picard)
+        path(bed)
+        val(filetype)
+        path(reference_dict)
+
+    output:
+        path("${filetype}_list.interval_list")
+
+    script:
+    """
+    java -jar ${picard} BedToIntervalList \
+        -I ${bed} \
+        -O ${filetype}_list.interval_list \
+        -SD ${reference_dict}
     """
 }
 
@@ -149,7 +173,7 @@ OUTPUT
     > amb, ann, bwt, pac and sa genome index files 
 
 INPUT FROM
-    <- reference_genome channel
+    <- reference_genome value channel
 
 OUTPUT INTO
     -> REFERENCE_INDEX_SETUP process (if make_index parameter is set on true)
@@ -168,31 +192,32 @@ OUTPUT INTO
 }
 
 process VARIATION_INDEX_SETUP {
-    cpus 2
 /*
 process description
 
 INPUT
-    < gatk : 
-    < dbsnp: 
+    < gatk  : path to the GATK toolkit java archive (.jar) file
+    < dbsnp : path to the dbsnp archive of human signe nucleotide 
+              variations and associated annotations
 
 OUTPUT
     > path to the .idx dbsnp index file
 
 INPUT FROM
-    <- gatk : gatk channel
-    <- dbsnp: dbsnp channel
+    <- gatk : gatk value channel
+    <- dbsnp: dbsnp value channel
 
 OUTPUT INTO
     -> HAPLOTYPECALLER process
 */
+    cpus 2
 
     input:
-    path(gatk)
-    path(dbsnp)
+        path(gatk)
+        path(dbsnp)
 
     output:
-    path('*.idx')
+        path('*.idx')
 
     script:
     """
@@ -200,61 +225,45 @@ OUTPUT INTO
     """
 }
 
-process SAM_SETUP {
-    cpus 4
+process ANNOTATION_DICTIONNARY_SETUP {
 /*
-Sets up the sam file by calling bwa mem to align the fastq on 
-the reference genome.
-If the path to index files has not been passed to parameters or the index files
-are absent, the pipeline builds the index files with the REFERENCE_INDEX_SETUP beforehand
+process description
 
-INPUTS
-(linked)
-    < sampleId             : patient ID value
-    < fastq_r1 and fastq_r2: NGS reads 
-        (both files if doing paired-end, only fastq_r1 if doing single-end)
-    
-    < reference_genome     : path to the reference genome (.fna file)
-    
-(linked)
-    < .amb, .ann, .bwt, .pac and .sa genome index files 
+INPUT
+    < python_annot    : Path to the python script building a .json dictionary from
+                        an artifact and a transcript base
+    < transcript_base : File containing known transcripts
+    < artifact_base   : File containing known sequencing artifacts in the lab
+    < pipeline_version: current version of the pipelin, used to name the dictionary
 
 OUTPUT
-(linked)
-    < sampleId: patient ID value
-    < sam     : path to the sam (Sequence Alignment Map, aligned reads) file 
+    > variant_dictionary_routine_v${pipeline_version}.json: path to the .idx dbsnp index file
 
 INPUT FROM
-    <- reference_genome          : reference_genome channel
-
-    <- amb, ann, bwt, pac, sa:
-    reference_index channel 
-        if the reference genome has already been indexed)
-    OR
-    REFERENCE_INDEX_SETUP process
-        (if the genome index files are not found)
-
-    <- sampleId,fastq_r!,fastq_r2: setup_reads channel
+    <- python_annot    : python_annot value channel
+    <- transcript_base : transcript_base value channel
+    <- artifact_base   : artifact_base value channel
+    <- pipeline_version: pipeline_version value channel
 
 OUTPUT INTO
-    -> BAM_SETUP process
+    -> MERGE_ANNOTATION_FILES process
 */
     input:
-        tuple val(sampleId), path(fastq_r1), path(fastq_r2)
-        path(reference_genome)
-        tuple path(amb), path(ann), path(bwt), path(pac), path(sa)
-    
-    output:
-        tuple val(sampleId), path("${sampleId}.sam")
+        python(python_annot)
+        path(transcript_base)
+        path(artifact_base)
+        val(pipeline_version)
+
+    output;
+        path(variant_dictionary_routine_v${pipeline_version}.json)
 
     script:
     """
-    bwa mem -t $task.cpus -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} -o ${sampleId}.sam
+    python ${python_annot} -a ${artifact_base} -t ${transcript_base} -c variant_dictionary_routine_v${pipeline_version}.json
     """
 }
 
 process BAM_SETUP {
-    cpus 4
 /*
 Sets up the bam (binary ve
 
@@ -277,8 +286,13 @@ OUTPUT INTO
     -> BAM_SETUP process (sorted_bam)
     -> STDOUT (mapping stats)
 */
+    tag "${sampleId}"
+    cpus 4
+
     input:
-        tuple val(sampleId), path("${sampleId}.sam")
+        tuple val(sampleId), path(fastq_r1), path(fastq_r2)
+        path(reference_genome)
+        tuple path(amb), path(ann), path(bwt), path(pac), path(sa)
 
     output:
         tuple val(sampleId), path("${sampleId}_sorted.bam"), emit: sorted_bam
@@ -286,9 +300,8 @@ OUTPUT INTO
         
     script:
     """
-    samtools view -@ $task.cpus -Sh ${sampleId}.sam -bo ${sampleId}.bam
 
-    samtools sort -@ $task.cpus ${sampleId}.bam -o ${sampleId}_sorted.bam
+    bwa mem -t $task.cpus -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
 
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
 
@@ -299,7 +312,6 @@ OUTPUT INTO
 }
 
 process BAM_MAPPING {
-    cpus 4
 /*
 Filters the reads not mapped to the reference genome (ox4 tag) with samtools 
 Sets up the bam index (bai) with samtools index
@@ -322,6 +334,9 @@ INPUT FROM
 OUTPUT INTO
     -> DUPMARK_BAM_SETUP, COVERAGE_ANALYSIS processes
 */
+    tag "${sampleId}"
+    cpus 4
+
     input:
         tuple val(sampleId), path("${sampleId}_sorted.bam")
 
@@ -337,9 +352,10 @@ OUTPUT INTO
 }
 
 process ON_TARGET_MAPPING {
-    cpus 2
 /*
-
+Filters reads by position (relative to reference geneme mapping), keeping only
+position that are clinically relevant
+Sets up the bam index (bai) with samtools index
 
 INPUTS
 (linked)
@@ -348,13 +364,13 @@ INPUTS
                              the reads correctly mapped on the genome 
     < mapped_sorted_bam.bai: path to the mapped_sorted_bam index
 
-    < bed_hemato       : coordinates of targets relevant to the analysis
+    < bed_bait              : coordinates of sequences relevant to the analysis
 
 OUTPUT
 (linked)
     > sampleId     : patient ID value
-    > on_target_bam: path to binary mapped with reads that are sorted and 
-                     off target reads filtered
+    > on_target_bam: path to binary mapped sorted reads,
+                     with off target reads filtered
     > on_target_bam.bai: path to the on_target bam index
 
 INPUT FROM
@@ -363,34 +379,36 @@ INPUT FROM
 OUTPUT INTO
     -> DUPMARK_BAM_SETUP, COVERAGE_ANALYSIS processes
 */
+    tag "${sampleId}"
+    cpus 2
+
     input:
         tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
-        path(bed_hemato)
+        path(bed_bait)
 
     output:
         tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
 
     script:
     """
-    bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_hemato} > ${sampleId}_on_target.bam
+    bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_bait} > ${sampleId}_on_target.bam
 
     samtools index -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_on_target.bam.bai
     """
 }
 
 process DUPMARK_BAM_SETUP {
-    cpus 4
 /*
 Uses picard to filter duplicates in the on_target bam file
 
 INPUTS
     (linked)
     < sampleId         : patient ID value
-    < on_target_bam    : path to binary mapped with reads that are sorted and 
-                         off target reads filtered
+    < on_target_bam    : path to binary mapped sorted reads,
+                         with off target reads filtered
     < on_target_bam.bai: path to the on_target bam index
 
-    < picard           : 
+    < picard           : path to the Picard java archive file (.jar)
 
 OUTPUT
 (linked)
@@ -401,28 +419,57 @@ OUTPUT
 
 INPUT FROM
     <- sampleId,on_target_bam,on_target_bam.bai: ON_TARGET_MAPPING process
-    <- picard                                  : picard channel    
+    <- picard                                  : picard value channel    
 
 OUTPUT INTO
     -> COVERAGE_ANALYSIS, VARSCAN, MUTECT2, HAPLOTYPECALLER, PINDEL processes
 */
+    tag "${sampleId}"
+    cpus 4
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*.marked_dup.metrics.txt"
+
     input:
         tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai") 
         path(picard)
 
     output:
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai"), emit: bam
+        path("${sampleId}.marked_dup.metrics.txt"), emit: metrics
 
     script:
     """
-    java -jar ${picard} MarkDuplicates -I ${sampleId}_on_target.bam -M ${sampleId}.marked_dup.metrics.txt -O ${sampleId}_dupmark.bam
+    java -Xmx4g -jar ${picard} MarkDuplicates -I ${sampleId}_on_target.bam -M ${sampleId}.marked_dup.metrics.txt -O ${sampleId}_dupmark.bam
     
     samtools index -@ $task.cpus ${sampleId}_dupmark.bam > ${sampleId}_dupmark.bam.bai
     """
 }
 
+process COLLECT_HS_METRICS {
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
+
+    input:
+        path(picard)
+        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
+        path(reference_genome)
+        path(reference_fai)
+        path(design_interval_list)
+        path(exon_interval_list)
+
+    output:
+        path("*")
+
+    script:
+    """
+    java -jar ${picard} CollectHsMetrics \
+        I=${sampleId}_mapped_sorted.bam \
+        O=${sampleId}_output_hs_metrics.txt \
+        R=${reference_genome} \
+        BAIT_INTERVALS=${design_interval_list} \
+        TARGET_INTERVALS=${exon_interval_list}
+    """
+}
+
 process COVERAGE_ANALYSIS {
-    cpus 2
 /*
 Uses samtools make a coverage analysis
     - Mapped reads on reference genome
@@ -450,7 +497,7 @@ INPUTS
     < dupmark_bam.bai      : path to the dupmark bam index
 
     < report_rscript       :
-    < bed_hemato           : coordinates of targets relevant to the analysis
+    < bed_bait             : coordinates of targets relevant to the analysis
     < bed_exon             : coordinates of exons relevant to the analysis
 
 OUTPUT
@@ -465,43 +512,38 @@ INPUT FROM
     <- sampleId,mapped_sorted_bam,mapped_sorted_bam.bai: BAM_MAPPING process
     <- sampleId,on_target_bam,on_target_bam.bai        : ON_TARGET_MAPPING process
     <- sampleId,dupmark_bam,dupmark_bam.bai            : DUPMARK_BAM_SETUP process
-    <- bed_hemato                                      : bed_hemato channel
-    <- bed_exon                                        : bed_exon channel
+    <- bed_bait                                        : bed_bait value channel
+    <- bed_exon                                        : bed_exon value channel
 
 OUTPUT INTO
     $params.results/$sampleId/Coverage; coverage analysis directory
-*/
-    publishDir "$params.results/$sampleId/Coverage", mode: 'copy'
+*/  
+    tag "${sampleId}"
+    cpus 2
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
 
     input:
         tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
         tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
         tuple env(mapped_reads), env(unmapped_reads), env(chimeric_reads)
-//        path(report_rscript)
-        path(bed_hemato)
+        path(bed_bait)
         path(bed_exon)
 
     output:
-        path "*"
+        path '*'
 
     script:
     """
-    samtools coverage ${sampleId}_mapped_sorted.bam -m > ${sampleId}_coverage.bed
-
-    samtools coverage ${sampleId}_on_target.bam -m > ${sampleId}_on_target.bed
-
-    samtools flagstat -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_bam_sort_stats
-
-    bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_hemato} -v > ${sampleId}_off_target.bam
+    samtools flagstat -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_in_target_stats
     
-    bedtools coverage -a ${bed_exon} -b ${sampleId}_dupmark.bam -d > ${sampleId}_coverage
+    mosdepth ${sampleId}_on_target -b ${bed_bait} ${sampleId}_mapped_sorted.bam -t $task.cpus
+
+    mosdepth ${sampleId}_exon -b ${bed_exon} ${sampleId}_on_target.bam -t $task.cpus
     """
 //    R -e "rmarkdown::render('${report_rscript}', params = list(file='coverage',user='${USER}',pipeline='FoxNGS V1.0A',output='statistics_coverage.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),output_file='${sampleId}_couverture_analyse.bed.html')"
 }
 
 process VARSCAN {
-    cpus 2
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
 using varscan
@@ -524,19 +566,24 @@ OUTPUT
 
 INPUT FROM
     <- sampleId,dupmark.bam,dupmark.bai: DUPMARK_BAM_SETUP process
-    <- reference_genome                : reference_genome channel
-    <- varscan                         : varscan channel
+    <- reference_genome                : reference_genome value channel
+    <- varscan                         : varscan value channel
 
 OUTPUT INTO
     -> ANNOVAR process
-*/
+*/  
+    tag "${sampleId}"
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: "*_varscan.vcf"
+    cpus 2
+
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
         path(reference_genome)
         path(varscan)
 
     output:
-        tuple val(sampleId), path("${sampleId}_varscan.vcf")
+        tuple val(sampleId), val("varscan"), path("${sampleId}_varscan.vcf"), emit: varscan_variation
+        path("${sampleId}.mpileup"), emit: mpileup
 
     script:
     """
@@ -548,13 +595,13 @@ OUTPUT INTO
 
 
 process MUTECT2 {
-    cpus 2
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
 using Mutect2 from the GATK software suite
 
 INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
+
     (linked)
     < sampleId        : patient ID value
     < dupmark.bam     : path to binary mapped reads that are sorted, 
@@ -563,7 +610,7 @@ INPUT
 
     < reference_genome: path to the reference genome (.fna file)
     < indexed genome  : path to the reference genome index (.fna.fai file)
-    < reference_dict  : path to the reference genome dictionnary (.dict file)
+    < reference_dict  : path to the reference genome dictionary (.dict file)
 
 OUTPUT
     (linked)
@@ -572,13 +619,16 @@ OUTPUT
 
 INPUT FROM
     <- sampleId,dupmark.bam,dupmark.bam.bai: DUPMARK_BAM_SETUP process
-    <- reference_genome                    : reference_genome channel
+    <- reference_genome                    : reference_genome value channel
     <- indexed_genome                      : REFERENCE_INDEX_SETUP
     <- reference_dict                      : REFERENCE_DICT_SETUP process
 
 OUTPUT INTO
     -> ANNOVAR process
 */
+    tag "${sampleId}"
+    cpus 2
+
     input:
         path(gatk)
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -587,7 +637,7 @@ OUTPUT INTO
         path(reference_dict)
 
     output:
-        tuple val(sampleId), path("${sampleId}_mutect2.vcf")
+        tuple val(sampleId), val("mutect2"), path("${sampleId}_mutect2.vcf")
 
     script:
     """
@@ -599,16 +649,14 @@ OUTPUT INTO
 
 
 process HAPLOTYPECALLER {
-    cpus 2
 /*
-
-
 Calls genome variation in the .bam files (comparing it to the reference genome)
 using HaplotypeCaller from the GATK software suite. Uses dbsnp to filter SNP
 that are reported as non-pathogenic.
 
 INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
+
     (linked)
     < sampleId        : patient ID value
     < dupmark.bam     : path to binary mapped reads that are sorted, 
@@ -617,7 +665,7 @@ INPUT
 
     < reference_genome: path to the reference genome (.fna file)
     < indexed_genome  : path to the reference genome index (.fna.fai file)
-    < reference_dict  : path to the reference genome dictionnary (.dict file)
+    < reference_dict  : path to the reference genome dictionary (.dict file)
     < dbsnp           : path to the dbsnp archive of human signe nucleotide 
                         variations and associated annotations
     < dbsnp_idx       : path 
@@ -631,15 +679,19 @@ OUTPUT
 
 INPUT FROM
     <- sampleId, dupmark.bam, dupmark.bai: DUPMARK_BAM_SETUP process
-    <- reference_genome                  : reference_genome channel
+    <- reference_genome                  : reference_genome value channel
     <- indexed_genome                    : FAI_SETUP process
     <- reference_dict                    : REFERENCE_DICT_SETUP process
-    <- dbsnp                             : dbsnp channel
+    <- dbsnp                             : dbsnp value channel
     <- dbsnp_idx                         : VARIATION_INDEX_SETUP process
 
 OUTPUT INTO
     -> ANNOVAR process
 */
+    tag "${sampleId}"
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: "*._recal.table"
+    cpus 2
+
     input:
         path(gatk)
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -650,7 +702,8 @@ OUTPUT INTO
         path(dbsnp_idx)
 
     output:
-        tuple val(sampleId), path("${sampleId}_haplotypecaller.vcf")
+        tuple val(sampleId), val("gatk"), path("${sampleId}_haplotypecaller.vcf"), emit: gatk_variation
+        path("${sampleId}_bqsr.bam"), emit: base_recalibration
 
     script:
         """
@@ -668,7 +721,7 @@ OUTPUT INTO
             -O ${sampleId}_bqsr.bam
 
 
-        java -jar ${gatk} HaplotypeCaller  \
+        java -jar ${gatk} HaplotypeCaller \
             -I ${sampleId}_bqsr.bam \
             -R ${reference_genome} \
             --min-base-quality-score 30 \
@@ -706,13 +759,14 @@ OUTPUT
 INPUT FROM
     <- sampleId, dupmark.bam, dupmark.bai            : DUPMARK_BAM_SETUP process
     <- sampleId, mapped_sorted.bam, mapped_sorted.bai: BAM_MAPPING process
-    <- reference_genome                              : reference_genome channel
-    <- pindel                                        : pindel channel
-    <- bed_pindel                                    : bed_pindel channel
+    <- reference_genome                              : reference_genome value channel
+    <- pindel                                        : pindel value channel
+    <- bed_pindel                                    : bed_pindel value channel
 
 OUTPUT INTO
     -> ANNOVAR process
 */
+    tag "${sampleId}"
 
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -722,7 +776,7 @@ OUTPUT INTO
         path(bed_pindel)
 
     output:
-        tuple val(sampleId), path('pindel.vcf')
+        tuple val(sampleId), val("pindel"), path('pindel.vcf')
 
     script:
     """
@@ -734,49 +788,118 @@ OUTPUT INTO
     """
 }
 
-/*
 process ANNOVAR {
-
-process description
+/*
+Annotates the vcf files from the variant calling processes using ANNOVAR and the following databases:
+    refGene, cytoBand, cosmic92, cosmic89, avsnp138, gnomad211_exome, clinvar_20200316, dbnsfp35a, IARC, icgc21
+Simplifies the ANNOVAR output from a vcf file to a csv, 
+Applies filtering to get clinically significant variants 
 
 INPUT
+    < annovar          : path to the ANNOVAR variant annotation software 
+    < reference_version: version of the referenge genome (hg19/hg38)
+
     (linked)
-    <
-    <
-    <
+    < sampleId         : patient ID value
+    < method           : method used to annotate the .bam file 
+                         (Varscan, Mutect2, Hapotypecaller (GATK) or Pindel)
+    < vcf              : path to the vcf corresponding to the sampleId and
+                         method used
 
-    <
-    <
-    <
-
+    < python_vcf_to_csv: path to the python script to simplify the vcf to a csv
+    < python_annot     : path to the python script filtering the csv table
 
 OUTPUT
-    >
+    (linked)
+    > sampleId                                           : patient ID value
+    > method                                             : method used to annotate the .bam file 
+                                                           (Varscan, Mutect2, Hapotypecaller (GATK) or Pindel)
+    > Filter_simple_annotation_${sampleId}_${method}.csv : comma separated values (.csv) file containing variants
+                                                           annotated and filtered
 
 INPUT FROM
-    <-
+    <- annovar              : annovar value channel
+    <- reference_version    : reference_version value
+    <- sampleId, method, vcf: VARSCAN, MUTECT2, HAPLOTYPECALLER, PINDEL processes
+        (This module is called 4 times as ANNOVAR_VSC, ANNOVAR_MT2, ANNOVAR_HTC and ANNOVAR_PDL)
+    <- python_vcf_to_csv    : python_vcf_to_csv value channel
+    <- python_annot         : python_annot value channel
 
 OUTPUT INTO
-    ->
-
+    -> MERGE_ANNOTATION_FILES
+*/
+    tag "${sampleId}"
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
     input:
-        val(reference_version)
-        path(vcf)
         path(annovar)
-        path(humandb)
-        path(python_annot)
+        val(reference_version)
+        tuple val(sampleId), val(method), path(vcf)
+        path(humandb_annovar)
         path(python_vcf_to_csv)
+        path(python_annot)
 
     output:
-        tuple val(sampleId), path(${sampleId}_processed_annotation.csv)
+        tuple val(sampleId), val(method), path("Filter_simple_annotation_${sampleId}_${method}.csv")
 
     script:
     """
-	${annovar}/table_annovar.pl ${vcf} ${annovar_db} -buildver hg${reference_version} -out ${sampleId}_annotated.vcf -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -thread $task.cpus -polish -vcfinput -xref ${annovar}/humandb/hg19_refGene.txt
+	${annovar}/table_annovar.pl ${vcf} ${humandb_annovar} -buildver hg${reference_version} -out ${sampleId}_${method}_annotated -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -polish -vcfinput -xref ${humandb_annovar}/hg19_refGene.txt
 
-	python3 ${python_vcf_to_csv} -inVCF ${sampleId}_annotated.vcf -toType table -out ${sampleId}_variation_annotation.csv
+	python ${python_vcf_to_csv} SimplifyVCF -inVCF ${sampleId}_${method}_annotated.hg${reference_version}_multianno.vcf -toType table -out simple_annotation_${sampleId}_${method}.csv
 
-	python3 ${python_annot} -f ${sampleId}_variation_annotation.csv -o ${sampleId}_processed_annotation.csv -m ${method}
+	python ${python_annot} -d . -f simple_annotation_${sampleId}_${method}.csv -o simple_annotation_${sampleId}_${method}.csv -m ${method}
     """
 }
+
+process MERGE_ANNOTATION_FILES {
+/*
+Gets all 4 annotated and filtered variation files and merges them to get the final variation file
+
+INPUT
+    < python_annot                                       : path to the python script merging variants csv 
+                                                           into a single .csv file
+
+    (linked)
+    < sampleId                                           : patient ID value
+    < method                                             : method used to annotate the .bam file 
+                                                           (Varscan, Mutect2, Hapotypecaller (GATK) or Pindel)
+    < Filter_simple_annotation_${sampleId}_${method}.csv : comma separated values (.csv) file containing variants
+                                                           annotated and filtered
+
+OUTPUT
+    (linked)
+    > sampleId                : patient ID value
+    > variants_${sampleId}.csv: comma separated values (.csv) file containing variants
+                                annotated and filtered, with merged values from all variant callers
+
+INPUT FROM
+    <- python_annot                                                        : python_annot value channel
+    <- sampleId, method, Filter_simple_annotation_${sampleId}_${method}.csv: ANNOVAR_VSC, ANNOVAR_MT2, 
+                                                                             ANNOVAR_HTC, ANNOVAR_PDL processes
+    <- annotation_dict                                                     : python_dict value channel
+                                                                             OR
+                                                                             ANNOTATION_DICTIONNARY_SETUP process
+
+OUTPUT INTO
+    -> MERGE_ANNOTATION_FILES
 */
+    tag "${sampleId}"
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', saveAs: "variants_merged.csv"
+
+    input:
+        path(python_annot)
+        tuple val(sampleId), val("varscan"), path("Filter_simple_annotation_${sampleId}_varscan.csv")
+        tuple val(sampleId), val("mutect2"), path("Filter_simple_annotation_${sampleId}_mutect2.csv")
+        tuple val(sampleId), val("haplotypecaller"), path("Filter_simple_annotation_${sampleId}_haplotypecaller.csv")
+        tuple val(sampleId), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
+        path(annotation_dict)
+
+
+    output:
+        val(sampleId), path("variants_${sampleId}_merged.csv")
+
+    script:
+    """
+    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv, Filter_simple_annotation_${sampleId}_mutect2.csv, Filter_simple_annotation_${sampleId}_haplotypecaller.csv, Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${NAME_RUN} -m all
+    """
+}

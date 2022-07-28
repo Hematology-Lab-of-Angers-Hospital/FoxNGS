@@ -8,10 +8,8 @@ results/*
 work/*
 pipeline_*
 
-timeline.html*
-report.html*
-flowchart.html*
-diagram.html*
+multiqc*
+
+*.html*
 
 linelog.txt
-dump.nf
