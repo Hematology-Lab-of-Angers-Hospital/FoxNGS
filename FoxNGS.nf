@@ -25,15 +25,14 @@ reads location             : $params.reads
 picard                     : $params.picard
 gatk                       : $params.gatk
 varscan                    : $params.varscan
-pindel                     : $params.pindel
 annovar                    : $params.annovar
 human annovar database     : $params.humandb_annovar
 vcf to csv python script   : $params.python_vcf_to_csv
 annotation python script   : $params.python_annot
 dict python script         : $params.python_dict   
 iarc python script         : $params.python_iarc
-transcripts base           : $params.base_transcript
-artefacts base             : $params.base_artefact
+transcripts base           : $params.transcript_base
+artefacts base             : $params.artefact_base
 variants_dictionary        : $params.annotation_dict
 results location           : $params.results
 help                       : $params.help
@@ -91,11 +90,9 @@ include {
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
-    PINDEL;
     ANNOVAR as ANNOVAR_VSC;
     ANNOVAR as ANNOVAR_MT2;
     ANNOVAR as ANNOVAR_HTC;
-    ANNOVAR as ANNOVAR_PDL;
     MERGE_ANNOTATION_FILES;
 } from './modules.nf'
 
@@ -140,8 +137,8 @@ workflow {
     vcf_to_csv_python = file(params.python_vcf_to_csv)
     python_annot      = file(params.python_annot)
     iarc_python       = file(params.python_iarc)
-    transcript_base = file(params.transcript_base)
-    artefact_base   = file(params.artefact_base)
+    transcript_base   = file(params.transcript_base)
+    artefact_base     = file(params.artefact_base)
 
 
     // DATA PROCESSING
@@ -183,23 +180,21 @@ workflow {
     VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
-    PINDEL(DUPMARK_BAM_SETUP.out.bam, BAM_MAPPING.out, reference_genome, reference_fai, pindel, bed_pindel)
 
     // Variant annotation
     ANNOVAR_VSC(annovar, reference_version, VARSCAN.out.varscan_variation, humandb_annovar, vcf_to_csv_python, python_annot)  
     ANNOVAR_MT2(annovar, reference_version, MUTECT2.out, humandb_annovar, vcf_to_csv_python, python_annot)
     ANNOVAR_HTC(annovar, reference_version, HAPLOTYPECALLER.out.gatk_variation, humandb_annovar, vcf_to_csv_python, python_annot)
-    ANNOVAR_PDL(annovar, reference_version, PINDEL.out, humandb_annovar, vcf_to_csv_python, python_annot)
 
 
     // Variant formatting and filtering
     if ( params.make_annot_dict ) {
         
         ANNOTATION_DICTIONNARY_SETUP(python_annot, artefact_base, transcript_base, params.pipeline_version)
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOVAR_PDL.out, ANNOTATION_DICTIONNARY_SETUP.out)
+        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOTATION_DICTIONNARY_SETUP.out)
     }
 
     else {
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOVAR_PDL.out, annotation_dict)
+        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, annotation_dict)
     }
 }

@@ -430,7 +430,7 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     cpus 4
-    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*.marked_dup.metrics.txt"
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
 
     input:
         tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai") 
@@ -915,11 +915,10 @@ OUTPUT INTO
         tuple val(sampleId), val("varscan"), path("Filter_simple_annotation_${sampleId}_varscan.csv")
         tuple val(sampleId), val("mutect2"), path("Filter_simple_annotation_${sampleId}_mutect2.csv")
         tuple val(sampleId), val("gatk"), path("Filter_simple_annotation_${sampleId}_gatk.csv")
-        tuple val(sampleId), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
         path(annotation_dict)
 
     script:
     """
-    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${NAME_RUN} -m merge
+    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${params.run_number} -m merge
     """
 }
