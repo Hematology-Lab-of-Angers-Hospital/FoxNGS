@@ -137,7 +137,8 @@ INPUT FROM
     <- reference_dict: REFERENCE_DICT_SETUP process
 
 OUTPUT INTO
-    -> 
+    -> COLLECT_HS_METRICS (The process is called twice as BAIT_BED_INTERVAL_SET and EXON_BED_INTERVAL_SET
+    Both processes outputs are passed to COLLECT_HS_METRICS)
 */
     input:
         path(picard)
@@ -221,7 +222,8 @@ OUTPUT INTO
 
     script:
     """
-    java -jar ${gatk} IndexFeatureFile -I ${dbsnp}
+    java -jar ${gatk} IndexFeatureFile \
+        -I ${dbsnp}
     """
 }
 
@@ -248,14 +250,16 @@ INPUT FROM
 OUTPUT INTO
     -> MERGE_ANNOTATION_FILES process
 */
+    stageInMode "link"
+
     input:
-        python(python_annot)
-        path(transcript_base)
+        path(python_annot)
         path(artifact_base)
+        path(transcript_base)
         val(pipeline_version)
 
-    output;
-        path(variant_dictionary_routine_v${pipeline_version}.json)
+    output:
+        path("variant_dictionary_routine_v${pipeline_version}.json")
 
     script:
     """
@@ -438,7 +442,10 @@ OUTPUT INTO
 
     script:
     """
-    java -Xmx4g -jar ${picard} MarkDuplicates -I ${sampleId}_on_target.bam -M ${sampleId}.marked_dup.metrics.txt -O ${sampleId}_dupmark.bam
+    java -Xmx4g -jar ${picard} MarkDuplicates \
+        -I ${sampleId}_on_target.bam \
+        -M ${sampleId}.marked_dup.metrics.txt \
+        -O ${sampleId}_dupmark.bam
     
     samtools index -@ $task.cpus ${sampleId}_dupmark.bam > ${sampleId}_dupmark.bam.bai
     """
@@ -540,7 +547,6 @@ OUTPUT INTO
 
     mosdepth ${sampleId}_exon -b ${bed_exon} ${sampleId}_on_target.bam -t $task.cpus
     """
-//    R -e "rmarkdown::render('${report_rscript}', params = list(file='coverage',user='${USER}',pipeline='FoxNGS V1.0A',output='statistics_coverage.csv',output_gene='/media/t-chu-027/Elements/Result_NGS/Stat_gene/Statistic_couverture_gene.csv',ratio_library='${int_ratio}'),output_file='${sampleId}_couverture_analyse.bed.html')"
 }
 
 process VARSCAN {
@@ -573,7 +579,6 @@ OUTPUT INTO
     -> ANNOVAR process
 */  
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: "*_varscan.vcf"
     cpus 2
 
     input:
@@ -589,7 +594,16 @@ OUTPUT INTO
     """
     samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
 
-    java -jar ${varscan} mpileup2cns ${sampleId}.mpileup --min-coverage 50 --min-reads2 8 --min-avg-qual 30 --min-var-freq 0.02 --p-value 0.1 --strand-filter 0 --output-vcf --variants > ${sampleId}_varscan.vcf
+    java -jar ${varscan} mpileup2cns \
+        ${sampleId}.mpileup \
+        --min-coverage 50 \
+        --min-reads2 8 \
+        --min-avg-qual 30 \
+        --min-var-freq 0.02 \
+        --p-value 0.1 \
+        --strand-filter 0 \
+        --output-vcf \
+        --variants > ${sampleId}_varscan.vcf
     """
 }
 
@@ -641,7 +655,13 @@ OUTPUT INTO
 
     script:
     """
-	java -jar ${gatk} Mutect2 -I ${sampleId}_dupmark.bam -R ${reference_genome} --min-base-quality-score 30 --dont-use-soft-clipped-bases true --native-pair-hmm-threads $task.cpus -O ${sampleId}_mutect2.vcf.gz
+	java -jar ${gatk} Mutect2 \
+        -I ${sampleId}_dupmark.bam \
+        -R ${reference_genome} \
+        --min-base-quality-score 30 \
+        --dont-use-soft-clipped-bases true \
+        --native-pair-hmm-threads $task.cpus \
+        -O ${sampleId}_mutect2.vcf.gz
     
     gunzip ${sampleId}_mutect2.vcf.gz
     """
@@ -767,20 +787,23 @@ OUTPUT INTO
     -> ANNOVAR process
 */
     tag "${sampleId}"
+    stageInMode "copy"
+    afterScript 'rm reference_*; rm -r *pindel; rm *.bam*; '
 
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
         tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
         path(reference_genome)
+        path(reference_fai)
         path(pindel)
         path(bed_pindel)
 
     output:
-        tuple val(sampleId), val("pindel"), path('pindel.vcf')
+        tuple val(sampleId), val("pindel"), path("${sampleId}_pindel.vcf")
 
     script:
     """
-    echo -e "${sampleId}_dupmark.bam 800 Duplicate_mark\n${sampleId}_sorted.bam 800 All_read" > config_file_pindel.txt
+    echo -e "${sampleId}_dupmark.bam 800 Duplicate_mark\n${sampleId}_mapped_sorted.bam 800 All_read" > config_file_pindel.txt
     
     ${pindel}/pindel -f ${reference_genome} -i config_file_pindel.txt -j ${bed_pindel} -T $task.cpus -o ${sampleId}_ITD
 
@@ -830,6 +853,7 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
+
     input:
         path(annovar)
         val(reference_version)
@@ -884,22 +908,18 @@ OUTPUT INTO
     -> MERGE_ANNOTATION_FILES
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', saveAs: "variants_merged.csv"
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
 
     input:
         path(python_annot)
         tuple val(sampleId), val("varscan"), path("Filter_simple_annotation_${sampleId}_varscan.csv")
         tuple val(sampleId), val("mutect2"), path("Filter_simple_annotation_${sampleId}_mutect2.csv")
-        tuple val(sampleId), val("haplotypecaller"), path("Filter_simple_annotation_${sampleId}_haplotypecaller.csv")
+        tuple val(sampleId), val("gatk"), path("Filter_simple_annotation_${sampleId}_gatk.csv")
         tuple val(sampleId), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
         path(annotation_dict)
 
-
-    output:
-        val(sampleId), path("variants_${sampleId}_merged.csv")
-
     script:
     """
-    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv, Filter_simple_annotation_${sampleId}_mutect2.csv, Filter_simple_annotation_${sampleId}_haplotypecaller.csv, Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${NAME_RUN} -m all
+    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${NAME_RUN} -m merge
     """
 }

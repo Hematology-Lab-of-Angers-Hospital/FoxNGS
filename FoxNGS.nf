@@ -21,14 +21,9 @@ index files location       : $params.index
 bed_bait                   : $params.bed_bait
 bed_exon                   : $params.bed_exon
 bed_pindel                 : $params.bed_pindel
-entrypoint                 : $params.entrypoint
-bcl_runfolder              : $params.bcl
-samplesheet                : $params.samplesheet
-bcl2fastq_image            : $params.bcl2fastq_image
 reads location             : $params.reads
 picard                     : $params.picard
 gatk                       : $params.gatk
-report R script            : $params.report_rscript
 varscan                    : $params.varscan
 pindel                     : $params.pindel
 annovar                    : $params.annovar
@@ -38,7 +33,7 @@ annotation python script   : $params.python_annot
 dict python script         : $params.python_dict   
 iarc python script         : $params.python_iarc
 transcripts base           : $params.base_transcript
-artifacts base             : $params.base_artifact
+artefacts base             : $params.base_artefact
 variants_dictionary        : $params.annotation_dict
 results location           : $params.results
 help                       : $params.help
@@ -46,7 +41,6 @@ help                       : $params.help
 
 
 def helpMessage() {
-    // TODO nf-core: Add to this help message with new command line parameters
     log.info"""${ANSI_GREEN}
         ${ANSI_ORANGE}Fox NGS - Version ${params.pipeline_version}${ANSI_GREEN}
         
@@ -86,7 +80,7 @@ include {
     VARIATION_INDEX_SETUP;
     BED_INTERVAL_SETUP as BAIT_BED_INTERVAL_SET;
     BED_INTERVAL_SETUP as EXON_BED_INTERVAL_SET;
-//    ANNOTATION_DICTIONNARY_SETUP;
+    ANNOTATION_DICTIONNARY_SETUP;
     QUALITY_CONTROL;
     BAM_SETUP;
     BAM_MAPPING;
@@ -97,38 +91,31 @@ include {
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
-//    PINDEL;
-    ANNOVAR;
+    PINDEL;
     ANNOVAR as ANNOVAR_VSC;
     ANNOVAR as ANNOVAR_MT2;
     ANNOVAR as ANNOVAR_HTC;
-//    ANNOVAR as ANNOVAR_PDL;
-//    MERGE_ANNOTATION_FILES;
+    ANNOVAR as ANNOVAR_PDL;
+    MERGE_ANNOTATION_FILES;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
 workflow {
     // FILES CHANNEL
-    // Raw files
-    bcl_runfolder     = Channel.fromPath("${params.bcl}")
 
-    if ( params.entrypoint == "fastq") {
-        Channel.fromFilePairs("${params.reads}/*_R{1,2}_*.fastq.gz")
-            .map{ left, right ->  
-                def sampleId = left.split('_')[0]
-                def fastq_r1 = right[0]
-                def fastq_r2 = right[1]
-                tuple(sampleId, fastq_r1, fastq_r2)
-            }
-            .set { fastq_input }
-    }
+    Channel.fromFilePairs("${params.reads}/*_S*_R{1,2}_001.fastq.gz")
+        .map{ left, right ->  
+            def sampleId = left.split('_')[0]
+            def fastq_r1 = right[0]
+            def fastq_r2 = right[1]
+            tuple(sampleId, fastq_r1, fastq_r2)
+        }
+        .set { fastq_input }
+
     // VARIABLES SETUP
     reference_version = params.reference_version
-    make_annot_dict = params.make_annot_dict
 
     // FILES SETUP
-    // Sequence run samplesheet
-    samplesheet       = file("${params.samplesheet}")
     // Reference genome and derivatives (indexes, fasta index and dictionary)
     reference_genome  = file("${params.genome}/hg${params.reference_version}/*.fna")
     reference_index   = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
@@ -143,9 +130,6 @@ workflow {
     // Variation files
     dbsnp             = file(params.dbsnp)
     humandb_annovar   = file(params.humandb_annovar)
-//    report_rscript    = Channel.fromPath(params.report_rscript)
-    // Singularity images 
-    bcl2fastq_image   = file("${params.bcl2fastq_image}")
     // Software files
     picard            = file(params.picard)
     gatk              = file(params.gatk)
@@ -156,6 +140,8 @@ workflow {
     vcf_to_csv_python = file(params.python_vcf_to_csv)
     python_annot      = file(params.python_annot)
     iarc_python       = file(params.python_iarc)
+    transcript_base = file(params.transcript_base)
+    artefact_base   = file(params.artefact_base)
 
 
     // DATA PROCESSING
@@ -191,33 +177,29 @@ workflow {
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, BAM_MAPPING.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
-    COVERAGE_ANALYSIS(BAM_MAPPING.out, ON_TARGET_MAPPING.out, BAM_SETUP.out.mapping_stats, bed_bait, bed_exon) // report_rscript
+    COVERAGE_ANALYSIS(BAM_MAPPING.out, ON_TARGET_MAPPING.out, BAM_SETUP.out.mapping_stats, bed_bait, bed_exon)
     
     // Variant calling
     VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
-//    PINDEL(DUPMARK_BAM_SETUP.out, BAM_MAPPING.out, reference_genome, pindel, bed_pindel)
+    PINDEL(DUPMARK_BAM_SETUP.out.bam, BAM_MAPPING.out, reference_genome, reference_fai, pindel, bed_pindel)
 
     // Variant annotation
     ANNOVAR_VSC(annovar, reference_version, VARSCAN.out.varscan_variation, humandb_annovar, vcf_to_csv_python, python_annot)  
     ANNOVAR_MT2(annovar, reference_version, MUTECT2.out, humandb_annovar, vcf_to_csv_python, python_annot)
     ANNOVAR_HTC(annovar, reference_version, HAPLOTYPECALLER.out.gatk_variation, humandb_annovar, vcf_to_csv_python, python_annot)
-//    ANNOVAR_PDL(annovar, reference_version, PINDEL.out, humandb_annovar, vcf_to_csv_python, python_annot)
+    ANNOVAR_PDL(annovar, reference_version, PINDEL.out, humandb_annovar, vcf_to_csv_python, python_annot)
 
-/*
+
     // Variant formatting and filtering
-    if ( make_annot_dict ) {
-        python_dict     = file(params.python_dict)
-        transcript_base = file(params.transcript_base)
-        artifact_base   = file(params.artifact_base)
+    if ( params.make_annot_dict ) {
         
-        MAKE_ANNOTATION_DICTIONNARY(python_dict, artifact_base, transcript_base, pipeline_version)
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, HAPLOTYPECALLER.out, ANNOVAR_PDL.out, MAKE_ANNOTATION_DICTIONNARY.out)
+        ANNOTATION_DICTIONNARY_SETUP(python_annot, artefact_base, transcript_base, params.pipeline_version)
+        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOVAR_PDL.out, ANNOTATION_DICTIONNARY_SETUP.out)
     }
 
     else {
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, HAPLOTYPECALLER.out, ANNOVAR_PDL.out)
+        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOVAR_PDL.out, annotation_dict)
     }
-*/
 }
