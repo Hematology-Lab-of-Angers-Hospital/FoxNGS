@@ -250,7 +250,7 @@ INPUT FROM
 OUTPUT INTO
     -> MERGE_ANNOTATION_FILES process
 */
-    stageInMode "link"
+    stageInMode "copy"
 
     input:
         path(python_annot)
