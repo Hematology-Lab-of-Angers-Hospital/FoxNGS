@@ -250,7 +250,7 @@ INPUT FROM
 OUTPUT INTO
     -> MERGE_ANNOTATION_FILES process
 */
-    stageInMode "link"
+    stageInMode "copy"
 
     input:
         path(python_annot)
@@ -549,6 +549,13 @@ OUTPUT INTO
     """
 }
 
+/*
+process HOTSPOT_COVERAGE {
+    input:
+        tuple path path()
+}
+*/
+
 process VARSCAN {
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
@@ -788,7 +795,7 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     stageInMode "copy"
-    afterScript 'rm reference_*; rm -r *pindel; rm *.bam*; '
+    afterScript 'rm reference_*; rm -r *pindel; rm *.bam*;'
 
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
