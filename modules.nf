@@ -925,6 +925,9 @@ OUTPUT INTO
         tuple val(sampleId), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
         path(annotation_dict)
 
+    output:
+        path("*")
+
     script:
     """
     python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${params.run_id} -m merge
