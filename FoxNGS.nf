@@ -10,7 +10,7 @@ ${ANSI_ORANGE}F O X - N G S   V $params.pipeline_version
 ===============================================================================
 ${ANSI_RESET}
 
-run number                 : $params.run_number
+run number                 : $params.run_id
 make index                 : $params.make_index
 make fai                   : $params.make_fai
 make reference dictionary  : $params.make_ref_dict
@@ -32,8 +32,8 @@ vcf to csv python script   : $params.python_vcf_to_csv
 annotation python script   : $params.python_annot
 dict python script         : $params.python_dict   
 iarc python script         : $params.python_iarc
-transcripts base           : $params.base_transcript
-artefacts base             : $params.base_artefact
+transcripts base           : $params.transcript_base
+artefacts base             : $params.artefact_base
 variants_dictionary        : $params.annotation_dict
 results location           : $params.results
 help                       : $params.help
@@ -88,6 +88,7 @@ include {
     DUPMARK_BAM_SETUP;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
+    HOTSPOT_COVERAGE;
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
@@ -127,6 +128,7 @@ workflow {
     bed_bait          = file(params.bed_bait)
     bed_exon          = file(params.bed_exon)
     bed_pindel        = file(params.bed_pindel)
+    bed_hotspots      = file(params.bed_hotspots)
     // Variation files
     dbsnp             = file(params.dbsnp)
     humandb_annovar   = file(params.humandb_annovar)
@@ -171,14 +173,18 @@ workflow {
             reference_index)
     }
 
-    BAM_MAPPING(BAM_SETUP.out.sorted_bam)
+    BAM_MAPPING(BAM_SETUP.out)
     ON_TARGET_MAPPING(BAM_MAPPING.out, bed_bait)
     DUPMARK_BAM_SETUP(ON_TARGET_MAPPING.out, picard)
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, BAM_MAPPING.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
-    COVERAGE_ANALYSIS(BAM_MAPPING.out, ON_TARGET_MAPPING.out, BAM_SETUP.out.mapping_stats, bed_bait, bed_exon)
-    
+
+    coverage_channel = BAM_MAPPING.out.combine(ON_TARGET_MAPPING.out, by: 0)
+
+    COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
+    HOTSPOT_COVERAGE(COVERAGE_ANALYSIS.out.exons_per_base, bed_hotspots)
+
     // Variant calling
     VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
@@ -191,15 +197,21 @@ workflow {
     ANNOVAR_HTC(annovar, reference_version, HAPLOTYPECALLER.out.gatk_variation, humandb_annovar, vcf_to_csv_python, python_annot)
     ANNOVAR_PDL(annovar, reference_version, PINDEL.out, humandb_annovar, vcf_to_csv_python, python_annot)
 
+    variation_channel = ANNOVAR_VSC.out.combine(
+        ANNOVAR_MT2.out.combine(
+            ANNOVAR_HTC.out.combine(
+                ANNOVAR_PDL.out, by: 0)
+            , by: 0)
+        , by: 0)
 
     // Variant formatting and filtering
     if ( params.make_annot_dict ) {
         
         ANNOTATION_DICTIONNARY_SETUP(python_annot, artefact_base, transcript_base, params.pipeline_version)
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOVAR_PDL.out, ANNOTATION_DICTIONNARY_SETUP.out)
+        MERGE_ANNOTATION_FILES(python_annot, variation_channel, ANNOTATION_DICTIONNARY_SETUP.out)
     }
 
     else {
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOVAR_PDL.out, annotation_dict)
+        MERGE_ANNOTATION_FILES(python_annot, variation_channel, annotation_dict)
     }
 }

@@ -31,6 +31,8 @@ INPUT FROM
 OUTPUT INTO
     -> results/$patient_id/QC directory
 */
+    tag("${sampleId}")
+
     cpus 2
     publishDir "${params.results}/${sampleId}/QC", mode: 'copy'
 
@@ -299,8 +301,7 @@ OUTPUT INTO
         tuple path(amb), path(ann), path(bwt), path(pac), path(sa)
 
     output:
-        tuple val(sampleId), path("${sampleId}_sorted.bam"), emit: sorted_bam
-        tuple env(mapped_reads), env(unmapped_reads), env(chimeric_reads), emit: mapping_stats
+        tuple val(sampleId), path("${sampleId}_sorted.bam")
         
     script:
     """
@@ -329,7 +330,7 @@ OUTPUT
 (linked)
     > sampleId             : patient ID value
     > mapped_sorted.bam    : path to file containing 
-                         the reads correctly mapped on the genome 
+                             the reads correctly mapped on the genome 
     > mapped_sorted.bam.bai: path to the mapped_sorted_bam index
 
 INPUT FROM
@@ -387,7 +388,7 @@ OUTPUT INTO
     cpus 2
 
     input:
-        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
+        tuple val(sampleId), path(mapped_sorted_bam), path("${sampleId}_mapped_sorted.bam.bai")
         path(bed_bait)
 
     output:
@@ -423,7 +424,7 @@ OUTPUT
 
 INPUT FROM
     <- sampleId,on_target_bam,on_target_bam.bai: ON_TARGET_MAPPING process
-    <- picard                                  : picard value channel    
+    <- picard                                  : picard value channel
 
 OUTPUT INTO
     -> COVERAGE_ANALYSIS, VARSCAN, MUTECT2, HAPLOTYPECALLER, PINDEL processes
@@ -452,6 +453,38 @@ OUTPUT INTO
 }
 
 process COLLECT_HS_METRICS {
+/*
+Uses the CollectHSMetrics funtion from the Picard suite to gather multiple
+metrics on coverage, mapping... The output is used in the multiqc report
+
+INPUT
+< picard        : path to the Picard java archive file (.jar)\
+
+(linked)
+< sampleId             : patient ID value
+< mapped_sorted.bam    : path to file containing 
+                         the reads correctly mapped on the genome 
+< mapped_sorted.bam.bai: path to the mapped_sorted_bam index
+
+< reference_genome     : path to the reference genome (.fna file)
+< reference_fai        : path to the reference genome index (.fna.fai file)
+< design_interval_list : path to the bait bed converted to an interval list
+< exon_interval_list   : path to the target exon bed converted to an interval list
+
+OUTPUT
+> 
+
+INPUT FROM
+<- picard                                            : picard value channel
+<- sampleId, mapped_sorted.bam, mapped_sorted.bam.bai: BAM_MAPPING process
+<- reference_genome                                  : reference_genome value channel
+<- reference_fai                                     : FAI_SETUP process
+<- design_interval_list, exon_interval_list          : BED_INTERVAL_SETUP process
+
+OUTPUT INTO
+-> $params.results/$sampleId/Coverage; coverage analysis directory
+*/
+    tag("${sampleId}")
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
 
     input:
@@ -496,24 +529,14 @@ INPUTS
     < on_target_bam        : path to binary mapped with reads that are sorted 
                              and off target reads filtered
     < on_target_bam.bai    : path to the on_target bam index
-    
-    (linked)
-    < sampleId             : patient ID value
-    < dupmark_bam          : path to binary mapped reads that are sorted, 
-                             off target reads filtered, with marked duplicates
-    < dupmark_bam.bai      : path to the dupmark bam index
 
-    < report_rscript       :
     < bed_bait             : coordinates of targets relevant to the analysis
     < bed_exon             : coordinates of exons relevant to the analysis
 
 OUTPUT
     (linked)
-    > coverage_bed
-    > on_target_bed
-    > bam_sort_stats
-    > off_target_bam
-    > coverage
+    > 
+    _on_target
 
 INPUT FROM
     <- sampleId,mapped_sorted_bam,mapped_sorted_bam.bai: BAM_MAPPING process
@@ -530,14 +553,13 @@ OUTPUT INTO
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
 
     input:
-        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
-        tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
-        tuple env(mapped_reads), env(unmapped_reads), env(chimeric_reads)
+        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai"), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
         path(bed_bait)
         path(bed_exon)
 
     output:
         path '*'
+        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), emit: exons_per_base
 
     script:
     """
@@ -549,12 +571,49 @@ OUTPUT INTO
     """
 }
 
-/*
+
 process HOTSPOT_COVERAGE {
-    input:
-        tuple path path()
-}
+/*
+Intersects a mosdepth exon.per_base coverage file with a hotspots postion file
+to check if these hotspots are covered above 200x. Issues a warning in the file
+named hotspots_warning.txt if any base in the coverage bed has a hospot position
+with a coverage value under 200 
+
+INPUT
+    (linked)
+    > sampleId             : patient ID value
+    > exon.per-base.bed.gz : path to the file containing coverage of exons with
+                             1 bp resolution
+
+OUTPUT
+    > hotspot_warnings.txt
+
+INPUT FROM
+    <- sampleId, exon.per-base.bed.gz: COVERAGE_ANALYSIS process 
+    <- bed_hotspots                  : bed_hotspots value channel
+
+OUTPUT INTO
+    -> $params.results/$sampleId/Coverage; coverage analysis directory
 */
+    tag "${sampleId}"
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
+    stageInMode 'copy'
+
+    input:
+        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz")
+        path(bed_hotspots)
+
+    output:
+        path("${sampleId}_hotspots_warning.txt")
+
+    script:
+    """
+    gunzip ${sampleId}_exon.per-base.bed.gz > coverage_exons_perbase
+    bedtools intersect -a ${bed_hotspots} -b coverage_exons_perbase -wao > hotspot_coverage.bed
+    cut -f 1,2,3,4,8 | awk -F '\t' '\$5 < 200' | awk -F'\t' '{if (NF==0) print "All hostpots covered above 200x"; else print "Warning : coverage under 200x at " \$4 " position " \$2}' > ${sampleId}_hotspots_warning.txt
+    """
+}
+
 
 process VARSCAN {
 /*
@@ -716,7 +775,7 @@ OUTPUT INTO
     -> ANNOVAR process
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: "*._recal.table"
+    publishDir "${params.results}/${sampleId}/QC", mode: 'copy', pattern: "*_recal.table"
     cpus 2
 
     input:
@@ -730,7 +789,7 @@ OUTPUT INTO
 
     output:
         tuple val(sampleId), val("gatk"), path("${sampleId}_haplotypecaller.vcf"), emit: gatk_variation
-        path("${sampleId}_bqsr.bam"), emit: base_recalibration
+        path("${sampleId}_recal.table"), emit: base_recalibration
 
     script:
         """
@@ -753,8 +812,9 @@ OUTPUT INTO
             -R ${reference_genome} \
             --min-base-quality-score 30 \
             --minimum-mapping-quality 20 \
+            --native-pair-hmm-threads 16 \
             --dont-use-soft-clipped-bases true \
-            -O ${sampleId}_haplotypecaller.vcf \
+            -O ${sampleId}_haplotypecaller.vcf
 
         awk '{gsub(",Date=[^>]+>",">");}1' ${sampleId}_haplotypecaller.vcf
         """
@@ -795,7 +855,7 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     stageInMode "copy"
-    afterScript 'rm reference_*; rm -r *pindel; rm *.bam*;'
+    afterScript 'rm *.bam*; rm *.fna; rm *_ITD'
 
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -860,6 +920,7 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
+    errorStrategy 'ignore'
 
     input:
         path(annovar)
@@ -919,10 +980,7 @@ OUTPUT INTO
 
     input:
         path(python_annot)
-        tuple val(sampleId), val("varscan"), path("Filter_simple_annotation_${sampleId}_varscan.csv")
-        tuple val(sampleId), val("mutect2"), path("Filter_simple_annotation_${sampleId}_mutect2.csv")
-        tuple val(sampleId), val("gatk"), path("Filter_simple_annotation_${sampleId}_gatk.csv")
-        tuple val(sampleId), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
+        tuple val(sampleId), val("varscan"), path("Filter_simple_annotation_${sampleId}_varscan.csv"), val("mutect2"), path("Filter_simple_annotation_${sampleId}_mutect2.csv"), val("gatk"), path("Filter_simple_annotation_${sampleId}_gatk.csv"), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
         path(annotation_dict)
 
     output:
@@ -930,6 +988,6 @@ OUTPUT INTO
 
     script:
     """
-    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId}.csv -i ${annotation_dict} -r ${params.run_id} -m merge
+    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId} -i ${annotation_dict} -r ${params.run_id} -m merge
     """
 }
