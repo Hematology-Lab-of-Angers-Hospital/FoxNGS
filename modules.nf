@@ -341,6 +341,7 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     cpus 4
+    publishDir "${params.results}/${sampleId}", mode: 'copy'
 
     input:
         tuple val(sampleId), path("${sampleId}_sorted.bam")
@@ -496,7 +497,7 @@ OUTPUT INTO
         path(exon_interval_list)
 
     output:
-        path("*")
+        tuple val(sampleId), path("${sampleId}_output_hs_metrics.txt")
 
     script:
     """
@@ -550,7 +551,7 @@ OUTPUT INTO
 */  
     tag "${sampleId}"
     cpus 2
-    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*.mosdepth.*"
 
     input:
         tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai"), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
@@ -559,7 +560,7 @@ OUTPUT INTO
 
     output:
         path '*'
-        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), emit: exons_per_base
+        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_on_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), emit: mosdepth_stats
 
     script:
     """
@@ -572,7 +573,7 @@ OUTPUT INTO
 }
 
 
-process HOTSPOT_COVERAGE {
+process PATIENT_REPORT {
 /*
 Intersects a mosdepth exon.per_base coverage file with a hotspots postion file
 to check if these hotspots are covered above 200x. Issues a warning in the file
@@ -596,21 +597,31 @@ OUTPUT INTO
     -> $params.results/$sampleId/Coverage; coverage analysis directory
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
+    publishDir "${params.results}/${sampleId}", mode: 'copy'
     stageInMode 'copy'
 
     input:
-        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz")
+        tuple val(sampleId), path("${sampleId}_output_hs_metrics.txt"), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_on_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_recal.table")
         path(bed_hotspots)
+        path(exon_template)
+        path(hotspot_template)
+        path(patient_report_config)
 
     output:
-        path("${sampleId}_hotspots_warning.txt")
+        path("${sampleId}_report.html")
 
     script:
     """
-    gunzip ${sampleId}_exon.per-base.bed.gz > coverage_exons_perbase
-    bedtools intersect -a ${bed_hotspots} -b coverage_exons_perbase -wao > hotspot_coverage.bed
-    cut -f 1,2,3,4,8 | awk -F '\t' '\$5 < 200' | awk -F'\t' '{if (NF==0) print "All hostpots covered above 200x"; else print "Warning : coverage under 200x at " \$4 " position " \$2}' > ${sampleId}_hotspots_warning.txt
+    cat ${hotspot_template} > ${sampleId}_hotspot_coverage_mqc.csv
+    cat ${exon_template} > ${sampleId}_exon_coverage_mqc.csv
+
+    gunzip ${sampleId}_exon.per-base.bed.gz
+    gunzip ${sampleId}_exon.regions.bed.gz
+    
+    bedtools intersect -a ${bed_hotspots} -b ${sampleId}_exon.per-base.bed -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{ if(\$4 < 500) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_hotspot_coverage_mqc.csv
+
+    cut -f 2,3,4,5 ${sampleId}_exon.regions.bed | awk -F '\t' -v OFS=',' '{if(\$4 < 200) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_exon_coverage_mqc.csv
+    multiqc . -c ${patient_report_config} -n ${sampleId}_report.html
     """
 }
 
@@ -775,7 +786,7 @@ OUTPUT INTO
     -> ANNOVAR process
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/QC", mode: 'copy', pattern: "*_recal.table"
+    publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*_recal.table"
     cpus 2
 
     input:
@@ -789,7 +800,7 @@ OUTPUT INTO
 
     output:
         tuple val(sampleId), val("gatk"), path("${sampleId}_haplotypecaller.vcf"), emit: gatk_variation
-        path("${sampleId}_recal.table"), emit: base_recalibration
+        tuple val(sampleId), path("${sampleId}_recal.table"), emit: base_recalibration
 
     script:
         """
@@ -919,7 +930,7 @@ OUTPUT INTO
     -> MERGE_ANNOTATION_FILES
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: "Filter_simple_annotation*"
     errorStrategy 'ignore'
 
     input:
@@ -976,18 +987,22 @@ OUTPUT INTO
     -> MERGE_ANNOTATION_FILES
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: 'Annotation_*.csv'
+    publishDir "${params.results}/${sampleId}", mode: 'copy', pattern: 'Annotation_*.xlsx'
 
     input:
         path(python_annot)
         tuple val(sampleId), val("varscan"), path("Filter_simple_annotation_${sampleId}_varscan.csv"), val("mutect2"), path("Filter_simple_annotation_${sampleId}_mutect2.csv"), val("gatk"), path("Filter_simple_annotation_${sampleId}_gatk.csv"), val("pindel"), path("Filter_simple_annotation_${sampleId}_pindel.csv")
         path(annotation_dict)
+        path(stats_dict)
 
     output:
         path("*")
 
     script:
     """
-    python ${python_annot} -d  . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId} -i ${annotation_dict} -r ${params.run_id} -m merge
+    python ${python_annot} -d . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId} -i ${annotation_dict} -r ${params.run_id} -m merge
+    python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
+    mv Annotation_${sampleId} ./Annotation_${sampleId}.csv
     """
 }

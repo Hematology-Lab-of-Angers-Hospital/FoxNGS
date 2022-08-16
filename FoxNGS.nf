@@ -88,7 +88,7 @@ include {
     DUPMARK_BAM_SETUP;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
-    HOTSPOT_COVERAGE;
+    PATIENT_REPORT;
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
@@ -118,32 +118,37 @@ workflow {
 
     // FILES SETUP
     // Reference genome and derivatives (indexes, fasta index and dictionary)
-    reference_genome  = file("${params.genome}/hg${params.reference_version}/*.fna")
-    reference_index   = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
-    reference_fai     = file("${params.genome}/hg${params.reference_version}/*.fna.fai")
-    reference_dict    = file("${params.genome}/hg${params.reference_version}/*.dict")
+    reference_genome      = file("${params.genome}/hg${params.reference_version}/*.fna")
+    reference_index       = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
+    reference_fai         = file("${params.genome}/hg${params.reference_version}/*.fna.fai")
+    reference_dict        = file("${params.genome}/hg${params.reference_version}/*.dict")
     // annotation dictionary
-    annotation_dict   = file("${params.annotation_dict}")
+    annotation_dict       = file("${params.annotation_dict}")
     // bed files
-    bed_bait          = file(params.bed_bait)
-    bed_exon          = file(params.bed_exon)
-    bed_pindel        = file(params.bed_pindel)
-    bed_hotspots      = file(params.bed_hotspots)
+    bed_bait              = file(params.bed_bait)
+    bed_exon              = file(params.bed_exon)
+    bed_pindel            = file(params.bed_pindel)
+    bed_hotspots          = file(params.bed_hotspots)
     // Variation files
-    dbsnp             = file(params.dbsnp)
-    humandb_annovar   = file(params.humandb_annovar)
+    dbsnp                 = file(params.dbsnp)
+    humandb_annovar       = file(params.humandb_annovar)
+    //Coverage report templates
+    exon_template         = file(params.exon_template)
+    hotspot_template      = file(params.hotspot_template)
+    patient_report_config = file(params.patient_report_config)
     // Software files
-    picard            = file(params.picard)
-    gatk              = file(params.gatk)
-    varscan           = file(params.varscan)
-    pindel            = file(params.pindel)
-    annovar           = file(params.annovar)
+    picard                = file(params.picard)
+    gatk                  = file(params.gatk)
+    varscan               = file(params.varscan)
+    pindel                = file(params.pindel)
+    annovar               = file(params.annovar)
     // Python scripts file
-    vcf_to_csv_python = file(params.python_vcf_to_csv)
-    python_annot      = file(params.python_annot)
-    iarc_python       = file(params.python_iarc)
-    transcript_base = file(params.transcript_base)
-    artefact_base   = file(params.artefact_base)
+    vcf_to_csv_python     = file(params.python_vcf_to_csv)
+    python_annot          = file(params.python_annot)
+    iarc_python           = file(params.python_iarc)
+    transcript_base       = file(params.transcript_base)
+    artefact_base         = file(params.artefact_base)
+    stats_dict            = file(params.stats_dict)
 
 
     // DATA PROCESSING
@@ -183,13 +188,20 @@ workflow {
     coverage_channel = BAM_MAPPING.out.combine(ON_TARGET_MAPPING.out, by: 0)
 
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
-    HOTSPOT_COVERAGE(COVERAGE_ANALYSIS.out.exons_per_base, bed_hotspots)
 
     // Variant calling
     VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
     PINDEL(DUPMARK_BAM_SETUP.out.bam, BAM_MAPPING.out, reference_genome, reference_fai, pindel, bed_pindel)
+
+    patient_report_channel = HAPLOTYPECALLER.out.base_recalibration.combine(
+        COVERAGE_ANALYSIS.out.mosdepth_stats.combine(
+            COLLECT_HS_METRICS.out,
+            by: 0),
+        by: 0)
+
+    PATIENT_REPORT(patient_report_channel, bed_hotspots, exon_template, hotspot_template, patient_report_config)
 
     // Variant annotation
     ANNOVAR_VSC(annovar, reference_version, VARSCAN.out.varscan_variation, humandb_annovar, vcf_to_csv_python, python_annot)  
@@ -200,18 +212,18 @@ workflow {
     variation_channel = ANNOVAR_VSC.out.combine(
         ANNOVAR_MT2.out.combine(
             ANNOVAR_HTC.out.combine(
-                ANNOVAR_PDL.out, by: 0)
-            , by: 0)
-        , by: 0)
+                ANNOVAR_PDL.out, by: 0),
+            by: 0),
+        by: 0)
 
     // Variant formatting and filtering
     if ( params.make_annot_dict ) {
         
         ANNOTATION_DICTIONNARY_SETUP(python_annot, artefact_base, transcript_base, params.pipeline_version)
-        MERGE_ANNOTATION_FILES(python_annot, variation_channel, ANNOTATION_DICTIONNARY_SETUP.out)
+        MERGE_ANNOTATION_FILES(python_annot, variation_channel, ANNOTATION_DICTIONNARY_SETUP.out, stats_dict)
     }
 
     else {
-        MERGE_ANNOTATION_FILES(python_annot, variation_channel, annotation_dict)
+        MERGE_ANNOTATION_FILES(python_annot, variation_channel, annotation_dict, stats_dict)
     }
 }
