@@ -10,7 +10,7 @@ ${ANSI_ORANGE}F O X - N G S   V $params.pipeline_version
 ===============================================================================
 ${ANSI_RESET}
 
-run number                 : $params.run_number
+run number                 : $params.run_id
 make index                 : $params.make_index
 make fai                   : $params.make_fai
 make reference dictionary  : $params.make_ref_dict
@@ -25,15 +25,6 @@ reads location             : $params.reads
 picard                     : $params.picard
 gatk                       : $params.gatk
 varscan                    : $params.varscan
-annovar                    : $params.annovar
-human annovar database     : $params.humandb_annovar
-vcf to csv python script   : $params.python_vcf_to_csv
-annotation python script   : $params.python_annot
-dict python script         : $params.python_dict   
-iarc python script         : $params.python_iarc
-transcripts base           : $params.transcript_base
-artefacts base             : $params.artefact_base
-variants_dictionary        : $params.annotation_dict
 results location           : $params.results
 help                       : $params.help
 """
@@ -87,13 +78,10 @@ include {
     DUPMARK_BAM_SETUP;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
+    PATIENT_REPORT;
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
-    ANNOVAR as ANNOVAR_VSC;
-    ANNOVAR as ANNOVAR_MT2;
-    ANNOVAR as ANNOVAR_HTC;
-    MERGE_ANNOTATION_FILES;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
@@ -114,32 +102,22 @@ workflow {
 
     // FILES SETUP
     // Reference genome and derivatives (indexes, fasta index and dictionary)
-    reference_genome  = file("${params.genome}/hg${params.reference_version}/*.fna")
-    reference_index   = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
-    reference_fai     = file("${params.genome}/hg${params.reference_version}/*.fna.fai")
-    reference_dict    = file("${params.genome}/hg${params.reference_version}/*.dict")
-    // annotation dictionary
-    annotation_dict   = file("${params.annotation_dict}")
+    reference_genome      = file("${params.genome}/hg${params.reference_version}/*.fna")
+    reference_index       = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
+    reference_fai         = file("${params.genome}/hg${params.reference_version}/*.fna.fai")
+    reference_dict        = file("${params.genome}/hg${params.reference_version}/*.dict")
     // bed files
-    bed_bait          = file(params.bed_bait)
-    bed_exon          = file(params.bed_exon)
-    bed_pindel        = file(params.bed_pindel)
-    // Variation files
-    dbsnp             = file(params.dbsnp)
-    humandb_annovar   = file(params.humandb_annovar)
+    bed_bait              = file(params.bed_bait)
+    bed_exon              = file(params.bed_exon)
+    bed_hotspots          = file(params.bed_hotspots)
+    //Coverage report templates
+    exon_template         = file(params.exon_template)
+    hotspot_template      = file(params.hotspot_template)
+    patient_report_config = file(params.patient_report_config)
     // Software files
-    picard            = file(params.picard)
-    gatk              = file(params.gatk)
-    varscan           = file(params.varscan)
-    pindel            = file(params.pindel)
-    annovar           = file(params.annovar)
-    // Python scripts file
-    vcf_to_csv_python = file(params.python_vcf_to_csv)
-    python_annot      = file(params.python_annot)
-    iarc_python       = file(params.python_iarc)
-    transcript_base   = file(params.transcript_base)
-    artefact_base     = file(params.artefact_base)
-
+    picard                = file(params.picard)
+    gatk                  = file(params.gatk)
+    varscan               = file(params.varscan)
 
     // DATA PROCESSING
     // Quality control
@@ -147,7 +125,6 @@ workflow {
 
     // Indexes setup
     REFERENCE_DICT_SETUP(gatk, reference_genome)
-    VARIATION_INDEX_SETUP(gatk, dbsnp)
     FAI_SETUP(reference_genome)
     BAIT_BED_INTERVAL_SET(picard, bed_bait, "bait", REFERENCE_DICT_SETUP.out)
     EXON_BED_INTERVAL_SET(picard, bed_exon, "exon", REFERENCE_DICT_SETUP.out)
@@ -168,33 +145,29 @@ workflow {
             reference_index)
     }
 
-    BAM_MAPPING(BAM_SETUP.out.sorted_bam)
+    BAM_MAPPING(BAM_SETUP.out)
     ON_TARGET_MAPPING(BAM_MAPPING.out, bed_bait)
     DUPMARK_BAM_SETUP(ON_TARGET_MAPPING.out, picard)
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, BAM_MAPPING.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
-    COVERAGE_ANALYSIS(BAM_MAPPING.out, ON_TARGET_MAPPING.out, BAM_SETUP.out.mapping_stats, bed_bait, bed_exon)
-    
+
+    coverage_channel = BAM_MAPPING.out.combine(ON_TARGET_MAPPING.out, by: 0)
+
+    COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
+
     // Variant calling
     VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
 
+    patient_report_channel = HAPLOTYPECALLER.out.base_recalibration.combine(
+        COVERAGE_ANALYSIS.out.mosdepth_stats.combine(
+            COLLECT_HS_METRICS.out,
+            by: 0),
+        by: 0)
+
+    PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
+
     // Variant annotation
-    ANNOVAR_VSC(annovar, reference_version, VARSCAN.out.varscan_variation, humandb_annovar, vcf_to_csv_python, python_annot)  
-    ANNOVAR_MT2(annovar, reference_version, MUTECT2.out, humandb_annovar, vcf_to_csv_python, python_annot)
-    ANNOVAR_HTC(annovar, reference_version, HAPLOTYPECALLER.out.gatk_variation, humandb_annovar, vcf_to_csv_python, python_annot)
-
-
-    // Variant formatting and filtering
-    if ( params.make_annot_dict ) {
-        
-        ANNOTATION_DICTIONNARY_SETUP(python_annot, artefact_base, transcript_base, params.pipeline_version)
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, ANNOTATION_DICTIONNARY_SETUP.out)
-    }
-
-    else {
-        MERGE_ANNOTATION_FILES(python_annot, ANNOVAR_VSC.out, ANNOVAR_MT2.out, ANNOVAR_HTC.out, annotation_dict)
-    }
 }
