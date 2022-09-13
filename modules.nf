@@ -306,7 +306,7 @@ OUTPUT INTO
     script:
     """
 
-    bwa mem -t $task.cpus -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
+    bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
 
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
 
@@ -603,6 +603,7 @@ OUTPUT INTO
     input:
         tuple val(sampleId), path("${sampleId}_output_hs_metrics.txt"), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_on_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_recal.table")
         path(bed_hotspots)
+        path(bed_exon)
         path(exon_template)
         path(hotspot_template)
         path(patient_report_config)
@@ -617,10 +618,10 @@ OUTPUT INTO
 
     gunzip ${sampleId}_exon.per-base.bed.gz
     gunzip ${sampleId}_exon.regions.bed.gz
-    
-    bedtools intersect -a ${bed_hotspots} -b ${sampleId}_exon.per-base.bed -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{ if(\$4 < 500) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_hotspot_coverage_mqc.csv
 
-    cut -f 2,3,4,5 ${sampleId}_exon.regions.bed | awk -F '\t' -v OFS=',' '{if(\$4 < 200) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_exon_coverage_mqc.csv
+    bedtools intersect -a ${bed_hotspots} -b ${sampleId}_exon.per-base.bed -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{ if(\$4 < 200) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_hotspot_coverage_mqc.csv
+    bedtools intersect -a ${sampleId}_exon.per-base.bed -b ${bed_exon} -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{if(\$3 < 200) print \$4}' | uniq -c | sed -e 's/^[ \t]*//' | sed -e "s/ /,/g" | awk -F ',' -v OFS=',' '{print \$2,\$1}' >> ${sampleId}_exon_coverage_mqc.csv
+
     multiqc . -c ${patient_report_config} -n ${sampleId}_report.html
     """
 }

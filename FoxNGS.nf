@@ -201,7 +201,7 @@ workflow {
             by: 0),
         by: 0)
 
-    PATIENT_REPORT(patient_report_channel, bed_hotspots, exon_template, hotspot_template, patient_report_config)
+    PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
 
     // Variant annotation
     ANNOVAR_VSC(annovar, reference_version, VARSCAN.out.varscan_variation, humandb_annovar, vcf_to_csv_python, python_annot)  
