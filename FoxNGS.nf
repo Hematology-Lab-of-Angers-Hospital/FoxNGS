@@ -156,11 +156,6 @@ workflow {
 
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
 
-    // Variant calling
-    VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
-    MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
-    HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
-
     patient_report_channel = HAPLOTYPECALLER.out.base_recalibration.combine(
         COVERAGE_ANALYSIS.out.mosdepth_stats.combine(
             COLLECT_HS_METRICS.out,
@@ -168,6 +163,11 @@ workflow {
         by: 0)
 
     PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
+
+    // Variant calling
+    VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
+    MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
+    HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
 
     // Variant annotation
 }
