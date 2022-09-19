@@ -84,8 +84,10 @@ include {
     QUALITY_CONTROL;
     BAM_SETUP;
     BAM_MAPPING;
-    ON_TARGET_MAPPING;
+    IN_TARGET_MAPPING;
     DUPMARK_BAM_SETUP;
+    MPILEUP_SETUP;
+    BQSR_BAM_SETUP;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
     PATIENT_REPORT;
@@ -179,23 +181,25 @@ workflow {
     }
 
     BAM_MAPPING(BAM_SETUP.out)
-    ON_TARGET_MAPPING(BAM_MAPPING.out, bed_bait)
-    DUPMARK_BAM_SETUP(ON_TARGET_MAPPING.out, picard)
+    IN_TARGET_MAPPING(BAM_MAPPING.out, bed_bait)
+    DUPMARK_BAM_SETUP(IN_TARGET_MAPPING.out, picard)
+    MPILEUP_SETUP(DUPMARK_BAM_SETUP.out.bam, reference_genome)
+    BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, BAM_MAPPING.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
 
-    coverage_channel = BAM_MAPPING.out.combine(ON_TARGET_MAPPING.out, by: 0)
+    coverage_channel = BAM_MAPPING.out.combine(IN_TARGET_MAPPING.out, by: 0)
 
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
 
     // Variant calling
-    VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
-    MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
-    HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
-    PINDEL(DUPMARK_BAM_SETUP.out.bam, BAM_MAPPING.out, reference_genome, reference_fai, pindel, bed_pindel)
+    VARSCAN(MPILEUP_SETUP.out, varscan)
+    MUTECT2(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
+    HAPLOTYPECALLER(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
+    PINDEL(BQSR_BAM_SETUP.out.bam, BAM_MAPPING.out, reference_genome, reference_fai, pindel, bed_pindel)
 
-    patient_report_channel = HAPLOTYPECALLER.out.base_recalibration.combine(
+    patient_report_channel = BQSR_BAM_SETUP.out.base_recalibration.combine(
         COVERAGE_ANALYSIS.out.mosdepth_stats.combine(
             COLLECT_HS_METRICS.out,
             by: 0),

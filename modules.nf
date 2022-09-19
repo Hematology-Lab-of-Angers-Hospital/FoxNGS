@@ -306,7 +306,9 @@ OUTPUT INTO
     script:
     """
 
-    bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
+    bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools fixmate -O bam - ${sampleId}.bam
+    samtools sort -@ $task.cpus ${sampleId}.bam > ${sampleId}_sorted.bam
+    samtools index -@ $task.cpus ${sampleId}_sorted.bam > ${sampleId}_sorted.bam.bai
 
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
 
@@ -357,7 +359,7 @@ OUTPUT INTO
     """
 }
 
-process ON_TARGET_MAPPING {
+process IN_TARGET_MAPPING {
 /*
 Filters reads by position (relative to reference geneme mapping), keeping only
 position that are clinically relevant
@@ -447,9 +449,89 @@ OUTPUT INTO
     java -Xmx4g -jar ${picard} MarkDuplicates \
         -I ${sampleId}_on_target.bam \
         -M ${sampleId}.marked_dup.metrics.txt \
+        --TAGGING_POLICY OpticalOnly \
         -O ${sampleId}_dupmark.bam
     
     samtools index -@ $task.cpus ${sampleId}_dupmark.bam > ${sampleId}_dupmark.bam.bai
+    """
+}
+
+process BQSR_BAM_SETUP {
+/*
+
+
+INPUT
+< 
+
+
+OUTPUT
+> 
+
+INPUT FROM
+<- 
+
+OUTPUT INTO
+-> 
+*/
+    input:
+    path(gatk)
+    tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+    path(reference_genome)
+    path(indexed_genome)
+    path(reference_dict)
+    path(dbsnp)
+    path(dbsnp_idx)
+
+    output:
+    tuple val(sampleId), path("${sampleId}_bqsr.bam"), path("${sampleId}_bqsr.bam.bai"), emit: bam
+    tuple val(sampleId), path("${sampleId}_recal.table"), emit: base_recalibration
+
+    script:
+    """
+    java -Xmx4g -jar ${gatk} BaseRecalibrator \
+        -I ${sampleId}_dupmark.bam \
+        -R ${reference_genome} \
+        --known-sites ${dbsnp} \
+        -O ${sampleId}_recal.table
+
+
+    java -Xmx2g -jar ${gatk} ApplyBQSR \
+        -I ${sampleId}_dupmark.bam \
+        -R ${reference_genome} \
+        -bqsr ${sampleId}_recal.table \
+        -O ${sampleId}_bqsr.bam
+
+    samtools index -@ $task.cpus ${sampleId}_bqsr.bam > ${sampleId}_bqsr.bam.bai
+    """
+}
+
+process MPILEUP_SETUP{
+/*
+
+
+INPUT
+< 
+
+
+OUTPUT
+> 
+
+INPUT FROM
+<- 
+
+OUTPUT INTO
+-> 
+*/
+    input:
+        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        path(reference_genome)
+
+    output:
+        tuple val(sampleId), path("${sampleId}.mpileup")
+
+    script:
+    """
+    samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
     """
 }
 
@@ -505,6 +587,7 @@ OUTPUT INTO
         I=${sampleId}_mapped_sorted.bam \
         O=${sampleId}_output_hs_metrics.txt \
         R=${reference_genome} \
+        NEAR_DISTANCE=0 \
         BAIT_INTERVALS=${design_interval_list} \
         TARGET_INTERVALS=${exon_interval_list}
     """
@@ -660,18 +743,14 @@ OUTPUT INTO
     cpus 2
 
     input:
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
-        path(reference_genome)
+        tuple val(sampleId), path("${sampleId}.mpileup")
         path(varscan)
 
     output:
         tuple val(sampleId), val("varscan"), path("${sampleId}_varscan.vcf"), emit: varscan_variation
-        path("${sampleId}.mpileup"), emit: mpileup
 
     script:
     """
-    samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
-
     java -jar ${varscan} mpileup2cns \
         ${sampleId}.mpileup \
         --min-coverage 50 \
@@ -723,7 +802,7 @@ OUTPUT INTO
 
     input:
         path(gatk)
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        tuple val(sampleId), path("${sampleId}_bqsr.bam"), path("${sampleId}_bqsr.bam.bai")
         path(reference_genome)
         path(indexed_genome)
         path(reference_dict)
@@ -734,14 +813,18 @@ OUTPUT INTO
     script:
     """
 	java -jar ${gatk} Mutect2 \
-        -I ${sampleId}_dupmark.bam \
+        -I ${sampleId}_bqsr.bam \
         -R ${reference_genome} \
         --min-base-quality-score 30 \
         --dont-use-soft-clipped-bases true \
-        --native-pair-hmm-threads $task.cpus \
+        --disable-read-filter NotDuplicateReadFilter \
+        --native-pair-hmm-threads 16 \
         -O ${sampleId}_mutect2.vcf.gz
-    
-    gunzip ${sampleId}_mutect2.vcf.gz
+
+	java -jar ${gatk} FilterMutectCalls \
+        -V ${sampleId}_mutect2.vcf.gz \
+        -R ${reference_genome} \
+        -O ${sampleId}_mutect2.vcf
     """
 }
 
@@ -792,39 +875,23 @@ OUTPUT INTO
 
     input:
         path(gatk)
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        tuple val(sampleId), path("${sampleId}_bqsr.bam"), path("${sampleId}_bqsr.bam.bai")
         path(reference_genome)
         path(indexed_genome)
         path(reference_dict)
-        path(dbsnp)
-        path(dbsnp_idx)
 
     output:
         tuple val(sampleId), val("gatk"), path("${sampleId}_haplotypecaller.vcf"), emit: gatk_variation
-        tuple val(sampleId), path("${sampleId}_recal.table"), emit: base_recalibration
 
     script:
         """
-        java -jar ${gatk} BaseRecalibrator \
-            -I ${sampleId}_dupmark.bam \
-            -R ${reference_genome} \
-            --known-sites ${dbsnp} \
-            -O ${sampleId}_recal.table
-
-
-        java -jar ${gatk} ApplyBQSR \
-            -I ${sampleId}_dupmark.bam \
-            -R ${reference_genome} \
-            -bqsr ${sampleId}_recal.table \
-            -O ${sampleId}_bqsr.bam
-
-
         java -jar ${gatk} HaplotypeCaller \
             -I ${sampleId}_bqsr.bam \
             -R ${reference_genome} \
             --min-base-quality-score 30 \
             --minimum-mapping-quality 20 \
             --native-pair-hmm-threads 16 \
+            --disable-read-filter NotDuplicateReadFilter \
             --dont-use-soft-clipped-bases true \
             -O ${sampleId}_haplotypecaller.vcf
 
@@ -870,7 +937,7 @@ OUTPUT INTO
     afterScript 'rm *.bam*; rm *.fna; rm *_ITD'
 
     input:
-        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
+        tuple val(sampleId), path("${sampleId}_bqsr.bam"), path("${sampleId}_bqsr.bam.bai")
         tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai")
         path(reference_genome)
         path(reference_fai)
@@ -882,7 +949,7 @@ OUTPUT INTO
 
     script:
     """
-    echo -e "${sampleId}_dupmark.bam 800 Duplicate_mark\n${sampleId}_mapped_sorted.bam 800 All_read" > config_file_pindel.txt
+    echo -e "${sampleId}_bqsr.bam 800 Duplicate_mark\n${sampleId}_mapped_sorted.bam 800 All_read" > config_file_pindel.txt
     
     ${pindel}/pindel -f ${reference_genome} -i config_file_pindel.txt -j ${bed_pindel} -T $task.cpus -o ${sampleId}_ITD
 
@@ -1006,4 +1073,4 @@ OUTPUT INTO
     python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
     mv Annotation_${sampleId} ./Annotation_${sampleId}.csv
     """
-}
+} 
