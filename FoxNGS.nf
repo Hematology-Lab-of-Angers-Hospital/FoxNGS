@@ -73,22 +73,27 @@ include {
     ANNOTATION_DICTIONNARY_SETUP;
     QUALITY_CONTROL;
     BAM_SETUP;
-    BAM_MAPPING;
-    ON_TARGET_MAPPING;
+    MAPPED_BAM_SETUP;
+    IN_TARGET_MAPPING;
     DUPMARK_BAM_SETUP;
+    BQSR_BAM_SETUP;
+    MPILEUP_SETUP;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
     PATIENT_REPORT;
     VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
+    VEP as VEP_HTC;
+    VEP as VEP_MT2;
+    VEP as VEP_VSC;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
 workflow {
     // FILES CHANNEL
 
-    Channel.fromFilePairs("${params.reads}/*_S*_R{1,2}_001.fastq.gz")
+    Channel.fromFilePairs("${params.reads}/*S*_R{1,2}_001.fastq.gz")
         .map{ left, right ->  
             def sampleId = left.split('_')[0]
             def fastq_r1 = right[0]
@@ -110,6 +115,8 @@ workflow {
     bed_bait              = file(params.bed_bait)
     bed_exon              = file(params.bed_exon)
     bed_hotspots          = file(params.bed_hotspots)
+    // Variation files
+    dbsnp                 = file(params.dbsnp)
     //Coverage report templates
     exon_template         = file(params.exon_template)
     hotspot_template      = file(params.hotspot_template)
@@ -119,12 +126,14 @@ workflow {
     gatk                  = file(params.gatk)
     varscan               = file(params.varscan)
 
+
     // DATA PROCESSING
     // Quality control
     QUALITY_CONTROL(fastq_input)
 
     // Indexes setup
     REFERENCE_DICT_SETUP(gatk, reference_genome)
+    VARIATION_INDEX_SETUP(gatk, dbsnp)
     FAI_SETUP(reference_genome)
     BAIT_BED_INTERVAL_SET(picard, bed_bait, "bait", REFERENCE_DICT_SETUP.out)
     EXON_BED_INTERVAL_SET(picard, bed_exon, "exon", REFERENCE_DICT_SETUP.out)
@@ -145,29 +154,29 @@ workflow {
             reference_index)
     }
 
-    BAM_MAPPING(BAM_SETUP.out)
-    ON_TARGET_MAPPING(BAM_MAPPING.out, bed_bait)
-    DUPMARK_BAM_SETUP(ON_TARGET_MAPPING.out, picard)
+    MAPPED_BAM_SETUP(BAM_SETUP.out)
+    IN_TARGET_MAPPING(MAPPED_BAM_SETUP.out, bed_bait)
+    DUPMARK_BAM_SETUP(IN_TARGET_MAPPING.out, picard)
+    BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, indexed_genome, reference_dict, dbsnp, dbsnp_idx)
+    MPILEUP_SETUP(DUPMARK_BAM_SETUP.out.bam, reference_genome)
 
     // Coverage analysis
-    COLLECT_HS_METRICS(picard, BAM_MAPPING.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
+    COLLECT_HS_METRICS(picard, MAPPED_BAM_SETUP.out, reference_genome, FAI_SETUP.out, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
 
-    coverage_channel = BAM_MAPPING.out.combine(ON_TARGET_MAPPING.out, by: 0)
+    coverage_channel = MAPPED_BAM_SETUP.out.combine(IN_TARGET_MAPPING.out, by: 0)
 
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
 
-    patient_report_channel = HAPLOTYPECALLER.out.base_recalibration.combine(
-        COVERAGE_ANALYSIS.out.mosdepth_stats.combine(
-            COLLECT_HS_METRICS.out,
-            by: 0),
-        by: 0)
+    // Variant calling
+    VARSCAN(MPILEUP_SETUP.out, varscan)
+    MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
+    HAPLOTYPECALLER(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
+
+    patient_report_channel = COVERAGE_ANALYSIS.out.mosdepth_stats.combine(COLLECT_HS_METRICS.out, by: 0)
 
     PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
 
-    // Variant calling
-    VARSCAN(DUPMARK_BAM_SETUP.out.bam, reference_genome, varscan)
-    MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
-    HAPLOTYPECALLER(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
-
-    // Variant annotation
+    VEP_HTC(HAPLOTYPECALLER.out)
+    VEP_MT2(MUTECT2.out)
+    VEP_VSC(VARSCAN.out.varscan_variation)
 }
