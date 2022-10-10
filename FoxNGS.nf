@@ -20,11 +20,10 @@ reference_version          : $params.reference_version
 index files location       : $params.index
 bed_bait                   : $params.bed_bait
 bed_exon                   : $params.bed_exon
-bed_pindel                 : $params.bed_pindel
+bed_hotspots               : $params.bed_hotspots
 reads location             : $params.reads
 picard                     : $params.picard
 gatk                       : $params.gatk
-varscan                    : $params.varscan
 results location           : $params.results
 help                       : $params.help
 """
@@ -43,7 +42,6 @@ def helpMessage() {
         Profiles (On local executor)
             ${ANSI_RED}normal${ANSI_GREEN} : 8 CPU
             ${ANSI_RED}fast${ANSI_GREEN} : 16 CPU
-            ${ANSI_RED}urgent${ANSI_GREEN} : 46 CPU
         
         pipeline insight
             ${ANSI_RED}-with-report${ANSI_GREEN} for a complete report on ressource attribution/usage
@@ -53,6 +51,8 @@ def helpMessage() {
         pipeline restart
             If for some reason the pipeline has failes and you need to restart it
             Use ${ANSI_RED}-resume${ANSI_GREEN} in the command to call cached processes
+
+        See NextFlow documentation on (nextflow.io/docs)
     ${ANSI_RESET}""".stripIndent()
 }
 
@@ -107,10 +107,10 @@ workflow {
 
     // FILES SETUP
     // Reference genome and derivatives (indexes, fasta index and dictionary)
-    reference_genome      = file("${params.genome}/hg${params.reference_version}/*.fna")
+    reference_genome      = file("${params.genome}/GRCh${params.reference_version}/*.fna")
     reference_index       = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
-    reference_fai         = file("${params.genome}/hg${params.reference_version}/*.fna.fai")
-    reference_dict        = file("${params.genome}/hg${params.reference_version}/*.dict")
+    reference_fai         = file("${params.genome}/GRCh${params.reference_version}/*.fna.fai")
+    reference_dict        = file("${params.genome}/GRCh${params.reference_version}/*.dict")
     // bed files
     bed_bait              = file(params.bed_bait)
     bed_exon              = file(params.bed_exon)
@@ -124,7 +124,6 @@ workflow {
     // Software files
     picard                = file(params.picard)
     gatk                  = file(params.gatk)
-    varscan               = file(params.varscan)
 
 
     // DATA PROCESSING
@@ -158,7 +157,6 @@ workflow {
     IN_TARGET_MAPPING(MAPPED_BAM_SETUP.out, bed_bait)
     DUPMARK_BAM_SETUP(IN_TARGET_MAPPING.out, picard)
     BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, indexed_genome, reference_dict, dbsnp, dbsnp_idx)
-    MPILEUP_SETUP(DUPMARK_BAM_SETUP.out.bam, reference_genome)
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, MAPPED_BAM_SETUP.out, reference_genome, FAI_SETUP.out, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
@@ -168,7 +166,6 @@ workflow {
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
 
     // Variant calling
-    VARSCAN(MPILEUP_SETUP.out, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
 
@@ -178,5 +175,4 @@ workflow {
 
     VEP_HTC(HAPLOTYPECALLER.out)
     VEP_MT2(MUTECT2.out)
-    VEP_VSC(VARSCAN.out.varscan_variation)
 }
