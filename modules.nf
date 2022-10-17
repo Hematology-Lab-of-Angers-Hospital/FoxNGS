@@ -305,8 +305,6 @@ OUTPUT INTO
         
     script:
     """
-
-
     bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
 
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
@@ -350,7 +348,7 @@ OUTPUT INTO
 
     script:
     """
-    samtools view -F ox4 -h -@ $task.cpus -b ${sampleId}_sorted.bam > ${sampleId}_mapped_sorted.bam
+    samtools view -F 0x4 -h -@ $task.cpus -b ${sampleId}_sorted.bam > ${sampleId}_mapped_sorted.bam
 
     samtools index -@ $task.cpus ${sampleId}_mapped_sorted.bam > ${sampleId}_mapped_sorted.bam.bai
     """
@@ -446,7 +444,7 @@ OUTPUT INTO
     java -Xmx4g -jar ${picard} MarkDuplicates \
         -I ${sampleId}_in_target.bam \
         -M ${sampleId}.marked_dup.metrics.txt \
-        --TAGGING_POLICY OpticalOnly \
+        --REMOVE_SEQUENCING_DUPLICATES true \
         -O ${sampleId}_dupmark.bam
     
     samtools index -@ $task.cpus ${sampleId}_dupmark.bam > ${sampleId}_dupmark.bam.bai
@@ -680,7 +678,7 @@ OUTPUT INTO
     stageInMode 'copy'
 
     input:
-        tuple val(sampleId), path("${sampleId}_output_hs_metrics.txt"), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_in_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz")
+        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_in_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_output_hs_metrics.txt")
         path(bed_hotspots)
         path(bed_exon)
         path(exon_template)
@@ -695,7 +693,7 @@ OUTPUT INTO
     cat ${hotspot_template} > ${sampleId}_hotspot_coverage_mqc.csv
     cat ${exon_template} > ${sampleId}_exon_coverage_mqc.csv
 
-    mv ${sampleId}_exon.per-base.bed.gz ${sampleId}_exon.per-base.bed
+    gunzip ${sampleId}_exon.per-base.bed.gz
 
     bedtools intersect -a ${bed_hotspots} -b ${sampleId}_exon.per-base.bed -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{ if(\$4 < 200) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_hotspot_coverage_mqc.csv
     bedtools intersect -a ${sampleId}_exon.per-base.bed -b ${bed_exon} -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{if(\$3 < 200) print \$4}' | uniq -c | sed -e 's/^[ \t]*//' | sed -e "s/ /,/g" | awk -F ',' -v OFS=',' '{print \$2,\$1}' >> ${sampleId}_exon_coverage_mqc.csv
@@ -807,7 +805,7 @@ OUTPUT INTO
 
     script:
     """
-	java -jar ${gatk} Mutect2 \
+    java -jar ${gatk} Mutect2 \
         -I ${sampleId}_bqsr.bam \
         -R ${reference_genome} \
         --min-base-quality-score 30 \
@@ -816,7 +814,7 @@ OUTPUT INTO
         --native-pair-hmm-threads 16 \
         -O ${sampleId}_mutect2.vcf.gz
 
-	java -jar ${gatk} FilterMutectCalls \
+    java -jar ${gatk} FilterMutectCalls \
         -V ${sampleId}_mutect2.vcf.gz \
         -R ${reference_genome} \
         -O ${sampleId}_mutect2.vcf
@@ -879,19 +877,19 @@ OUTPUT INTO
         tuple val(sampleId), val("gatk"), path("${sampleId}_haplotypecaller.vcf"), emit: gatk_variation
 
     script:
-        """
-        java -jar ${gatk} HaplotypeCaller \
-            -I ${sampleId}_bqsr.bam \
-            -R ${reference_genome} \
-            --min-base-quality-score 30 \
-            --minimum-mapping-quality 20 \
-            --native-pair-hmm-threads 16 \
-            --disable-read-filter NotDuplicateReadFilter \
-            --dont-use-soft-clipped-bases true \
-            -O ${sampleId}_haplotypecaller.vcf
+    """
+    java -jar ${gatk} HaplotypeCaller \
+        -I ${sampleId}_bqsr.bam \
+        -R ${reference_genome} \
+        --min-base-quality-score 30 \
+        --minimum-mapping-quality 20 \
+        --native-pair-hmm-threads 16 \
+        --disable-read-filter NotDuplicateReadFilter \
+        --dont-use-soft-clipped-bases true \
+        -O ${sampleId}_haplotypecaller.vcf
 
-        awk '{gsub(",Date=[^>]+>",">");}1' ${sampleId}_haplotypecaller.vcf
-        """
+    awk '{gsub(",Date=[^>]+>",">");}1' ${sampleId}_haplotypecaller.vcf
+    """
 }
 
 process PINDEL {
@@ -948,7 +946,7 @@ OUTPUT INTO
     
     ${pindel}/pindel -f ${reference_genome} -i config_file_pindel.txt -j ${bed_pindel} -T $task.cpus -o ${sampleId}_ITD
 
-	${pindel}/pindel2vcf -P ${sampleId}_ITD -r ${reference_genome} -R x -d 00000000 -G -v ${sampleId}_pindel.vcf
+    ${pindel}/pindel2vcf -P ${sampleId}_ITD -r ${reference_genome} -R x -d 00000000 -G -v ${sampleId}_pindel.vcf
     """
 }
 
@@ -1009,11 +1007,11 @@ OUTPUT INTO
 
     script:
     """
-	${annovar}/table_annovar.pl ${vcf} ${humandb_annovar} -buildver hg${reference_version} -out ${sampleId}_${method}_annotated -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -polish -vcfinput -xref ${humandb_annovar}/hg19_refGene.txt
+    ${annovar}/table_annovar.pl ${vcf} ${humandb_annovar} -buildver hg${reference_version} -out ${sampleId}_${method}_annotated -remove -protocol refGene,cytoBand,cosmic92,cosmic89,avsnp138,gnomad211_exome,clinvar_20200316,dbnsfp35a,IARC,icgc21 -operation gx,r,f,f,f,f,f,f,f,f -nastring . -polish -vcfinput -xref ${humandb_annovar}/hg19_refGene.txt
 
-	python ${python_vcf_to_csv} SimplifyVCF -inVCF ${sampleId}_${method}_annotated.hg${reference_version}_multianno.vcf -toType table -out simple_annotation_${sampleId}_${method}.csv
+    python ${python_vcf_to_csv} SimplifyVCF -inVCF ${sampleId}_${method}_annotated.hg${reference_version}_multianno.vcf -toType table -out simple_annotation_${sampleId}_${method}.csv
 
-	python ${python_annot} -d . -f simple_annotation_${sampleId}_${method}.csv -o simple_annotation_${sampleId}_${method}.csv -m ${method}
+    python ${python_annot} -d . -f simple_annotation_${sampleId}_${method}.csv -o simple_annotation_${sampleId}_${method}.csv -m ${method}
     """
 }
 
@@ -1032,18 +1030,24 @@ INPUT FROM
 OUTPUT INTO
 -> 
 */
+    cpus 4
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: '*.tsv'
 
     input:
     tuple val(sampleId), val(method), path("${sampleId}_${method}.vcf")
+    path(CADD_vep_plugin_indel)
+    path(CADD_vep_plugin_snv)
+    path(dbNSFP_vep_plugin)
+    path(gnomADc_vep_plugin)
 
     output:
-    tuple val(sampleId), val(method), path("${sampleId}_${method}.vcf")
+    tuple val(sampleId), val(method), path("${sampleId}_${method}.tsv")
 
     script:
     """
-    vep -i ${sampleId}_${method}.vcf -e --tab --cache -o ${sampleId}_${method}.csv
+    vep -i ${sampleId}_${method}.vcf --offline --fork $task.cpus --dir_cache $params.vep_cache --dir_plugins $params.vep_plugins -e --plugin CADD,${CADD_vep_plugin_indel},${CADD_vep_plugin_snv} --plugin gnomADc,${gnomADc_vep_plugin} --pick --tab -o ${sampleId}_${method}.tsv
+    sed -i "/^##.*\$/d" ${sampleId}_${method}.tsv
     """
 }
 
@@ -1106,12 +1110,45 @@ process MERGE_VEP_FILES {
 
     input:
         tuple val(sampleId), val("varscan"), path("varscan_${method}.csv"), val(mutect2), path("mutect2_${method}.csv"), val("gatk"), path("gatk_${method}.csv")
-
+        path(gatk)
+        path(reference_genome)
     output:
         path("*")
 
     script:
     """
 
+    """
+}
+
+process CONTROL_FREEC {
+/*
+INPUT
+<
+
+OUTPUT
+>
+
+INPUT FROM
+<-
+
+OUTPUT INTO
+->
+*/
+    tag "$sampleId"
+    publishDir "${params.results}/${sampleId}/Variation/CNV", mode: 'copy'
+
+    input:
+        tuple val(sampleId), path("${sampleId}_sorted.bam"), path("${sampleId}_sorted.bam.bai")
+        path(freec_config)
+        path(R_freec_graphics)
+
+    output:
+        path("*")
+
+    script:
+    """
+    freec -conf ${freec_config} -sample ${sampleId}_sorted.bam
+    cat ${R_freec_graphics} | R --slave --args 2 ${sampleId}_sorted.bam_ratio.txt
     """
 }

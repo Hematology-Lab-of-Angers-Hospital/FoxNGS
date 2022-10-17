@@ -20,11 +20,10 @@ reference_version          : $params.reference_version
 index files location       : $params.index
 bed_bait                   : $params.bed_bait
 bed_exon                   : $params.bed_exon
-bed_pindel                 : $params.bed_pindel
+bed_hotspots               : $params.bed_hotspots
 reads location             : $params.reads
 picard                     : $params.picard
 gatk                       : $params.gatk
-varscan                    : $params.varscan
 results location           : $params.results
 help                       : $params.help
 """
@@ -77,16 +76,15 @@ include {
     IN_TARGET_MAPPING;
     DUPMARK_BAM_SETUP;
     BQSR_BAM_SETUP;
+    CONTROL_FREEC;
     MPILEUP_SETUP;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
     PATIENT_REPORT;
-    VARSCAN;
     MUTECT2;
     HAPLOTYPECALLER;
     VEP as VEP_HTC;
     VEP as VEP_MT2;
-    VEP as VEP_VSC;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
@@ -107,25 +105,36 @@ workflow {
 
     // FILES SETUP
     // Reference genome and derivatives (indexes, fasta index and dictionary)
-    reference_genome      = file("${params.genome}/hg${params.reference_version}/*.fna")
-    reference_index       = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
-    reference_fai         = file("${params.genome}/hg${params.reference_version}/*.fna.fai")
-    reference_dict        = file("${params.genome}/hg${params.reference_version}/*.dict")
+    reference_genome      = file("${params.genome}/GRCh${params.reference_version}/*.fna")
+    reference_index       = file("${params.genome}/GRCh${params.reference_version}/*.{ann,amb,bwt,pac,sa}")
+    reference_fai         = file("${params.genome}/GRCh${params.reference_version}/*.fna.fai")
+    reference_dict        = file("${params.genome}/GRCh${params.reference_version}/*.dict")
+    variation_dict	  = file("${params.dbsnp}/*.tbi")
+    
     // bed files
     bed_bait              = file(params.bed_bait)
     bed_exon              = file(params.bed_exon)
     bed_hotspots          = file(params.bed_hotspots)
+    
     // Variation files
     dbsnp                 = file(params.dbsnp)
+    CADD_vep_plugin_indel = file(params.CADD_vep_plugin_indel)
+    CADD_vep_plugin_snv   = file(params.CADD_vep_plugin_snv)
+    dbNSFP_vep_plugin     = file(params.dbNSFP_vep_plugin)
+    gnomADc_vep_plugin    = file(params.gnomADc_vep_plugin)
+
     //Coverage report templates
     exon_template         = file(params.exon_template)
     hotspot_template      = file(params.hotspot_template)
     patient_report_config = file(params.patient_report_config)
+
     // Software files
     picard                = file(params.picard)
     gatk                  = file(params.gatk)
-    varscan               = file(params.varscan)
 
+    // CNV
+    freec_config          = file(params.freec_config)
+    R_freec_graphics      = file(params.R_freec_graphics)
 
     // DATA PROCESSING
     // Quality control
@@ -133,7 +142,6 @@ workflow {
 
     // Indexes setup
     REFERENCE_DICT_SETUP(gatk, reference_genome)
-    VARIATION_INDEX_SETUP(gatk, dbsnp)
     FAI_SETUP(reference_genome)
     BAIT_BED_INTERVAL_SET(picard, bed_bait, "bait", REFERENCE_DICT_SETUP.out)
     EXON_BED_INTERVAL_SET(picard, bed_exon, "exon", REFERENCE_DICT_SETUP.out)
@@ -157,8 +165,10 @@ workflow {
     MAPPED_BAM_SETUP(BAM_SETUP.out)
     IN_TARGET_MAPPING(MAPPED_BAM_SETUP.out, bed_bait)
     DUPMARK_BAM_SETUP(IN_TARGET_MAPPING.out, picard)
-    BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, indexed_genome, reference_dict, dbsnp, dbsnp_idx)
-    MPILEUP_SETUP(DUPMARK_BAM_SETUP.out.bam, reference_genome)
+    BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, reference_dict, dbsnp, variation_dict)
+
+    // CNV Analysis
+    CONTROL_FREEC(MAPPED_BAM_SETUP.out, freec_config, R_freec_graphics)
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, MAPPED_BAM_SETUP.out, reference_genome, FAI_SETUP.out, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
@@ -168,7 +178,6 @@ workflow {
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
 
     // Variant calling
-    VARSCAN(MPILEUP_SETUP.out, varscan)
     MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
 
@@ -176,7 +185,6 @@ workflow {
 
     PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
 
-    VEP_HTC(HAPLOTYPECALLER.out)
-    VEP_MT2(MUTECT2.out)
-    VEP_VSC(VARSCAN.out.varscan_variation)
+    VEP_HTC(HAPLOTYPECALLER.out, CADD_vep_plugin_indel, CADD_vep_plugin_snv, dbNSFP_vep_plugin, gnomADc_vep_plugin)
+    VEP_MT2(MUTECT2.out, CADD_vep_plugin_indel, CADD_vep_plugin_snv, dbNSFP_vep_plugin, gnomADc_vep_plugin)
 }
