@@ -83,7 +83,7 @@ include {
     ANNOTATION_DICTIONNARY_SETUP;
     QUALITY_CONTROL;
     BAM_SETUP;
-    BAM_MAPPING;
+    MAPPED_BAM_SETUP;
     IN_TARGET_MAPPING;
     DUPMARK_BAM_SETUP;
     MPILEUP_SETUP;
@@ -99,7 +99,7 @@ include {
     ANNOVAR as ANNOVAR_MT2;
     ANNOVAR as ANNOVAR_HTC;
     ANNOVAR as ANNOVAR_PDL;
-    MERGE_ANNOTATION_FILES;
+    MERGE_ANNOVAR_FILES;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
@@ -134,10 +134,11 @@ workflow {
     // Variation files
     dbsnp                 = file(params.dbsnp)
     humandb_annovar       = file(params.humandb_annovar)
-    //Coverage report templates
+    //Coverage files
     exon_template         = file(params.exon_template)
     hotspot_template      = file(params.hotspot_template)
     patient_report_config = file(params.patient_report_config)
+    coverage_stats        = file("${params.results}/Statistic_couverture.csv")
     // Software files
     picard                = file(params.picard)
     gatk                  = file(params.gatk)
@@ -180,24 +181,26 @@ workflow {
             reference_index)
     }
 
-    BAM_MAPPING(BAM_SETUP.out)
-    IN_TARGET_MAPPING(BAM_MAPPING.out, bed_bait)
+    BAM_SETUP.out.mapping_stats.view()
+
+    MAPPED_BAM_SETUP(BAM_SETUP.out.bam)
+    IN_TARGET_MAPPING(MAPPED_BAM_SETUP.out, bed_bait)
     DUPMARK_BAM_SETUP(IN_TARGET_MAPPING.out, picard)
     MPILEUP_SETUP(DUPMARK_BAM_SETUP.out.bam, reference_genome)
     BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
 
     // Coverage analysis
-    COLLECT_HS_METRICS(picard, BAM_MAPPING.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
+    COLLECT_HS_METRICS(picard, MAPPED_BAM_SETUP.out, reference_genome, reference_fai, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
 
-    coverage_channel = BAM_MAPPING.out.combine(IN_TARGET_MAPPING.out, by: 0)
+    coverage_channel = MAPPED_BAM_SETUP.out.combine(IN_TARGET_MAPPING.out, by: 0)
 
     COVERAGE_ANALYSIS(coverage_channel, bed_bait, bed_exon)
 
     // Variant calling
     VARSCAN(MPILEUP_SETUP.out, varscan)
-    MUTECT2(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
+    MUTECT2(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
     HAPLOTYPECALLER(gatk, BQSR_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out)
-    PINDEL(BQSR_BAM_SETUP.out.bam, BAM_MAPPING.out, reference_genome, reference_fai, pindel, bed_pindel)
+    PINDEL(DUPMARK_BAM_SETUP.out.bam, MAPPED_BAM_SETUP.out, reference_genome, reference_fai, pindel, bed_pindel)
 
     patient_report_channel = BQSR_BAM_SETUP.out.base_recalibration.combine(
         COVERAGE_ANALYSIS.out.mosdepth_stats.combine(
@@ -206,6 +209,8 @@ workflow {
         by: 0)
 
     PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
+
+    PATIENT_REPORT.out.patient_stats.subscribe { coverage_stats.append ( "$it" ) }
 
     // Variant annotation
     ANNOVAR_VSC(annovar, reference_version, VARSCAN.out.varscan_variation, humandb_annovar, vcf_to_csv_python, python_annot)  
@@ -224,10 +229,10 @@ workflow {
     if ( params.make_annot_dict ) {
         
         ANNOTATION_DICTIONNARY_SETUP(python_annot, artefact_base, transcript_base, params.pipeline_version)
-        MERGE_ANNOTATION_FILES(python_annot, variation_channel, ANNOTATION_DICTIONNARY_SETUP.out, stats_dict)
+        MERGE_ANNOVAR_FILES(python_annot, variation_channel, ANNOTATION_DICTIONNARY_SETUP.out, stats_dict)
     }
 
     else {
-        MERGE_ANNOTATION_FILES(python_annot, variation_channel, annotation_dict, stats_dict)
+        MERGE_ANNOVAR_FILES(python_annot, variation_channel, annotation_dict, stats_dict)
     }
 }

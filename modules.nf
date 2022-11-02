@@ -250,7 +250,7 @@ INPUT FROM
     <- pipeline_version: pipeline_version value channel
 
 OUTPUT INTO
-    -> MERGE_ANNOTATION_FILES process
+    -> MERGE_ANNOVAR_FILES process
 */
     stageInMode "copy"
 
@@ -293,7 +293,7 @@ OUTPUT INTO
     -> STDOUT (mapping stats)
 */
     tag "${sampleId}"
-    cpus 4
+    cpus 16
 
     input:
         tuple val(sampleId), path(fastq_r1), path(fastq_r2)
@@ -301,24 +301,24 @@ OUTPUT INTO
         tuple path(amb), path(ann), path(bwt), path(pac), path(sa)
 
     output:
-        tuple val(sampleId), path("${sampleId}_sorted.bam")
+        tuple val(sampleId), path("${sampleId}_sorted.bam"), emit: bam
+        stdout emit: mapping_stats
         
     script:
     """
 
-    bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools fixmate -O bam - ${sampleId}.bam
-    samtools sort -@ $task.cpus ${sampleId}.bam > ${sampleId}_sorted.bam
-    samtools index -@ $task.cpus ${sampleId}_sorted.bam > ${sampleId}_sorted.bam.bai
+
+    bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
 
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
-
     unmapped_reads=`samtools view -f 0x4 -h -@ $task.cpus -c -b ${sampleId}_sorted.bam`
-
     chimeric_reads=`samtools view  -f 0x800 -h -@ $task.cpus -c -b ${sampleId}_sorted.bam`
+
+    echo "${sampleId}\nMapped:\$mapped_reads\nUnmapped:\$unmapped_reads\nChimeric:\$chimeric_reads"
     """
 }
 
-process BAM_MAPPING {
+process MAPPED_BAM_SETUP {
 /*
 Filters the reads not mapped to the reference genome (ox4 tag) with samtools 
 Sets up the bam index (bai) with samtools index
@@ -382,7 +382,7 @@ OUTPUT
     > on_target_bam.bai: path to the on_target bam index
 
 INPUT FROM
-    <- BAM_MAPPING process
+    <- MAPPED_BAM_SETUP process
 
 OUTPUT INTO
     -> DUPMARK_BAM_SETUP, COVERAGE_ANALYSIS processes
@@ -395,13 +395,13 @@ OUTPUT INTO
         path(bed_bait)
 
     output:
-        tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
+        tuple val(sampleId), path("${sampleId}_in_target.bam"), path("${sampleId}_in_target.bam.bai")
 
     script:
     """
-    bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_bait} > ${sampleId}_on_target.bam
+    bedtools intersect -a ${sampleId}_mapped_sorted.bam -b ${bed_bait} > ${sampleId}_in_target.bam
 
-    samtools index -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_on_target.bam.bai
+    samtools index -@ $task.cpus ${sampleId}_in_target.bam > ${sampleId}_in_target.bam.bai
     """
 }
 
@@ -437,7 +437,7 @@ OUTPUT INTO
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*.marked_dup.metrics.txt"
 
     input:
-        tuple val(sampleId), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai") 
+        tuple val(sampleId), path("${sampleId}_in_target.bam"), path("${sampleId}_in_target.bam.bai") 
         path(picard)
 
     output:
@@ -447,7 +447,7 @@ OUTPUT INTO
     script:
     """
     java -Xmx4g -jar ${picard} MarkDuplicates \
-        -I ${sampleId}_on_target.bam \
+        -I ${sampleId}_in_target.bam \
         -M ${sampleId}.marked_dup.metrics.txt \
         --TAGGING_POLICY OpticalOnly \
         -O ${sampleId}_dupmark.bam
@@ -493,7 +493,6 @@ OUTPUT INTO
         -R ${reference_genome} \
         --known-sites ${dbsnp} \
         -O ${sampleId}_recal.table
-
 
     java -Xmx2g -jar ${gatk} ApplyBQSR \
         -I ${sampleId}_dupmark.bam \
@@ -559,7 +558,7 @@ OUTPUT
 
 INPUT FROM
 <- picard                                            : picard value channel
-<- sampleId, mapped_sorted.bam, mapped_sorted.bam.bai: BAM_MAPPING process
+<- sampleId, mapped_sorted.bam, mapped_sorted.bam.bai: MAPPED_BAM_SETUP process
 <- reference_genome                                  : reference_genome value channel
 <- reference_fai                                     : FAI_SETUP process
 <- design_interval_list, exon_interval_list          : BED_INTERVAL_SETUP process
@@ -620,10 +619,10 @@ INPUTS
 OUTPUT
     (linked)
     > 
-    _on_target
+    _in_target
 
 INPUT FROM
-    <- sampleId,mapped_sorted_bam,mapped_sorted_bam.bai: BAM_MAPPING process
+    <- sampleId,mapped_sorted_bam,mapped_sorted_bam.bai: MAPPED_BAM_SETUP process
     <- sampleId,on_target_bam,on_target_bam.bai        : ON_TARGET_MAPPING process
     <- sampleId,dupmark_bam,dupmark_bam.bai            : DUPMARK_BAM_SETUP process
     <- bed_bait                                        : bed_bait value channel
@@ -637,21 +636,21 @@ OUTPUT INTO
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*.mosdepth.*"
 
     input:
-        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai"), path("${sampleId}_on_target.bam"), path("${sampleId}_on_target.bam.bai")
+        tuple val(sampleId), path("${sampleId}_mapped_sorted.bam"), path("${sampleId}_mapped_sorted.bam.bai"), path("${sampleId}_in_target.bam"), path("${sampleId}_in_target.bam.bai")
         path(bed_bait)
         path(bed_exon)
 
     output:
         path '*'
-        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_on_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), emit: mosdepth_stats
+        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_in_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), emit: mosdepth_stats
 
     script:
     """
-    samtools flagstat -@ $task.cpus ${sampleId}_on_target.bam > ${sampleId}_in_target_stats
+    samtools flagstat -@ $task.cpus ${sampleId}_in_target.bam > ${sampleId}_in_target_stats
     
-    mosdepth ${sampleId}_on_target -b ${bed_bait} ${sampleId}_mapped_sorted.bam -t $task.cpus
+    MOSDEPTH_PRECISION=4 mosdepth ${sampleId}_in_target -b ${bed_bait} ${sampleId}_mapped_sorted.bam -t $task.cpus
 
-    mosdepth ${sampleId}_exon -b ${bed_exon} ${sampleId}_on_target.bam -t $task.cpus
+    mosdepth ${sampleId}_exon -b ${bed_exon} ${sampleId}_in_target.bam -t $task.cpus
     """
 }
 
@@ -680,11 +679,11 @@ OUTPUT INTO
     -> $params.results/$sampleId/Coverage; coverage analysis directory
 */
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}", mode: 'copy'
+    publishDir "${params.results}/${sampleId}", mode: 'copy', pattern: "*_report.html"
     stageInMode 'copy'
 
     input:
-        tuple val(sampleId), path("${sampleId}_output_hs_metrics.txt"), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_on_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_recal.table")
+        tuple val(sampleId), path("${sampleId}_recal.table"), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_in_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_output_hs_metrics.txt")
         path(bed_hotspots)
         path(bed_exon)
         path(exon_template)
@@ -693,19 +692,25 @@ OUTPUT INTO
 
     output:
         path("${sampleId}_report.html")
+        env(patient_stats), emit: patient_stats
 
     script:
     """
     cat ${hotspot_template} > ${sampleId}_hotspot_coverage_mqc.csv
     cat ${exon_template} > ${sampleId}_exon_coverage_mqc.csv
 
-    gunzip ${sampleId}_exon.per-base.bed.gz
-    gunzip ${sampleId}_exon.regions.bed.gz
+    mv ${sampleId}_exon.per-base.bed.gz ${sampleId}_exon.per-base.bed
 
     bedtools intersect -a ${bed_hotspots} -b ${sampleId}_exon.per-base.bed -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{ if(\$4 < 200) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_hotspot_coverage_mqc.csv
     bedtools intersect -a ${sampleId}_exon.per-base.bed -b ${bed_exon} -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{if(\$3 < 200) print \$4}' | uniq -c | sed -e 's/^[ \t]*//' | sed -e "s/ /,/g" | awk -F ',' -v OFS=',' '{print \$2,\$1}' >> ${sampleId}_exon_coverage_mqc.csv
 
-    multiqc . -c ${patient_report_config} -n ${sampleId}_report.html
+    multiqc . -q -c ${patient_report_config} -n ${sampleId}_report.html
+
+    in_target=`echo \$(grep 'bait_list\\s' ${sampleId}_output_hs_metrics.txt | cut -f 7 | sed s/,/./)*100 | bc -l`
+    coverage=`grep 'bait_list\\s' ${sampleId}_output_hs_metrics.txt | cut -f 34 | sed s/,/./`
+    bases_over_200x=`echo \$(grep 'total\\s200\\s' ${sampleId}_in_target.mosdepth.region.dist.txt | cut -f 3)*100 | bc -l`
+    
+    patient_stats=\$(echo "${sampleId},\$in_target,\${coverage%.*},\$bases_over_200x\\n")
     """
 }
 
@@ -802,7 +807,7 @@ OUTPUT INTO
 
     input:
         path(gatk)
-        tuple val(sampleId), path("${sampleId}_bqsr.bam"), path("${sampleId}_bqsr.bam.bai")
+        tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
         path(reference_genome)
         path(indexed_genome)
         path(reference_dict)
@@ -813,7 +818,7 @@ OUTPUT INTO
     script:
     """
 	java -jar ${gatk} Mutect2 \
-        -I ${sampleId}_bqsr.bam \
+        -I ${sampleId}_dupmark.bam \
         -R ${reference_genome} \
         --min-base-quality-score 30 \
         --dont-use-soft-clipped-bases true \
@@ -825,6 +830,20 @@ OUTPUT INTO
         -V ${sampleId}_mutect2.vcf.gz \
         -R ${reference_genome} \
         -O ${sampleId}_mutect2.vcf
+
+	java -jar ${gatk} Mutect2 \
+        -I ${sampleId}_dupmark.bam \
+        -R ${reference_genome} \
+        --min-base-quality-score 30 \
+        --dont-use-soft-clipped-bases true \
+        --disable-read-filter NotDuplicateReadFilter \
+        --native-pair-hmm-threads 16 \
+        -L chr5:170837531-170837888 \
+        -O ${sampleId}_NPM1_mutect2.vcf.gz
+
+    gunzip ${sampleId}_NPM1_mutect2.vcf.gz
+
+    awk '!/^#+/' ${sampleId}_NPM1_mutect2.vcf >> ${sampleId}_mutect2.vcf
     """
 }
 
@@ -924,7 +943,7 @@ OUTPUT
 
 INPUT FROM
     <- sampleId, dupmark.bam, dupmark.bai            : DUPMARK_BAM_SETUP process
-    <- sampleId, mapped_sorted.bam, mapped_sorted.bai: BAM_MAPPING process
+    <- sampleId, mapped_sorted.bam, mapped_sorted.bai: MAPPED_BAM_SETUP process
     <- reference_genome                              : reference_genome value channel
     <- pindel                                        : pindel value channel
     <- bed_pindel                                    : bed_pindel value channel
@@ -995,7 +1014,7 @@ INPUT FROM
     <- python_annot         : python_annot value channel
 
 OUTPUT INTO
-    -> MERGE_ANNOTATION_FILES
+    -> MERGE_ANNOVAR_FILES
 */
     tag "${sampleId}"
     publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: "Filter_simple_annotation*"
@@ -1022,7 +1041,37 @@ OUTPUT INTO
     """
 }
 
-process MERGE_ANNOTATION_FILES {
+process VEP {
+/*
+INPUT
+< 
+
+
+OUTPUT
+> 
+
+INPUT FROM
+<- 
+
+OUTPUT INTO
+-> 
+*/
+    tag "${sampleId}"
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
+
+    input:
+    tuple val(sampleId), val(method), path("${sampleId}_${method}.vcf")
+
+    output:
+    tuple val(sampleId), val(method), path("${sampleId}_${method}.vcf")
+
+    script:
+    """
+    vep -i ${sampleId}_${method}.vcf -e --tab --cache -o ${sampleId}_${method}.csv
+    """
+}
+
+process MERGE_ANNOVAR_FILES {
 /*
 Gets all 4 annotated and filtered variation files and merges them to get the final variation file
 
@@ -1052,7 +1101,7 @@ INPUT FROM
                                                                              ANNOTATION_DICTIONNARY_SETUP process
 
 OUTPUT INTO
-    -> MERGE_ANNOTATION_FILES
+    -> MERGE_ANNOVAR_FILES
 */
     tag "${sampleId}"
     publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: 'Annotation_*.csv'
@@ -1073,4 +1122,34 @@ OUTPUT INTO
     python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
     mv Annotation_${sampleId} ./Annotation_${sampleId}.csv
     """
-} 
+}
+
+process MERGE_VEP_FILES {
+/*
+INPUT
+< 
+
+
+OUTPUT
+> 
+
+INPUT FROM
+<- 
+
+OUTPUT INTO
+-> 
+*/
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: 'Annotation_*.csv'
+    publishDir "${params.results}/${sampleId}", mode: 'copy', pattern: 'Annotation_*.xlsx'
+
+    input:
+        tuple val(sampleId), val("varscan"), path("varscan_${method}.csv"), val(mutect2), path("mutect2_${method}.csv"), val("gatk"), path("gatk_${method}.csv")
+
+    output:
+        path("*")
+
+    script:
+    """
+
+    """
+}

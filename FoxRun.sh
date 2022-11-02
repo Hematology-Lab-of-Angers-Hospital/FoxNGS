@@ -7,3 +7,4 @@ mv timeline.html ../results/reports
 mv report.html ../results/reports
 multiqc ../results -o ../results/reports
 nextflow clean -f;
+awk -i inplace '{gsub(/\\n/,"\n")}1' ../results/Statistic_couverture.csv; sed -i /^$/d ../results/Statistic_couverture.csv
