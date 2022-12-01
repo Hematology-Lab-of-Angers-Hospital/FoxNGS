@@ -703,6 +703,39 @@ OUTPUT INTO
 }
 
 
+process CONTROL_FREEC {
+/*
+INPUT
+<
+
+OUTPUT
+>
+
+INPUT FROM
+<-
+
+OUTPUT INTO
+->
+*/
+    tag "$sampleId"
+    publishDir "${params.results}/${sampleId}/Variation/CNV", mode: 'copy'
+
+    input:
+        tuple val(sampleId), path("${sampleId}.mpileup")
+        path(freec_config)
+        path(R_freec_graphics)
+
+    output:
+        path("*")
+
+    script:
+    """
+    freec -conf ${freec_config} -sample ${sampleId}.mpileup
+    cat ${R_freec_graphics} | R --slave --args ${sampleId}.mpileup_ratio.txt ${sampleId}.mpileup_BAF.txt $sampleId
+    """
+}
+
+
 process VARSCAN {
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
@@ -892,6 +925,7 @@ OUTPUT INTO
     """
 }
 
+
 process PINDEL {
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
@@ -949,6 +983,34 @@ OUTPUT INTO
     ${pindel}/pindel2vcf -P ${sampleId}_ITD -r ${reference_genome} -R x -d 00000000 -G -v ${sampleId}_pindel.vcf
     """
 }
+
+
+process MERGE_VCF {
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: 'Annotation_*.csv'
+
+    input:
+        tuple val(sampleId), val(mutect2), path("${sampleId}_mutect2.vcf"), val("gatk"), path("${sampleId}_gatk.vcf")
+        path(picard)
+        path(reference_genome)
+        path(reference_dict)
+
+    output:
+        tuple val(sampleId), path("${sampleId}_merged_dedup.vcf") 
+
+    script:
+    """
+    java -jar ${picard} MergeVcfs \
+        -I ${sampleId}_mutect2.vcf \
+        -I ${sampleId}_gatk.vcf \
+        -R ${reference_genome} \
+        -D ${reference_dict} \
+        -O ${sampleId}_merged.vcf
+    
+    LC_ALL=C sort -t \$'\t' -k1,1 -k2,2n -k4,4 ${sampleId}_merged.vcf | \
+    awk -F '\t' '/^#/ {print;prev="";next;} {key=sprintf("%s\t%s\t%s",\$1,\$2,\$4);if(key==prev) next;print;prev=key;}' > ${sampleId}_merged_dedup.vcf
+    """
+}
+
 
 process ANNOVAR {
 /*
@@ -1015,6 +1077,7 @@ OUTPUT INTO
     """
 }
 
+
 process VEP {
 /*
 INPUT
@@ -1032,24 +1095,62 @@ OUTPUT INTO
 */
     cpus 4
     tag "${sampleId}"
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: '*.tsv'
+    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy'
 
     input:
-    tuple val(sampleId), val(method), path("${sampleId}_${method}.vcf")
-    path(CADD_vep_plugin_indel)
-    path(CADD_vep_plugin_snv)
-    path(dbNSFP_vep_plugin)
-    path(gnomADc_vep_plugin)
+    tuple val(sampleId), path("${sampleId}_merged_dedup.vcf")
+    path(reference_genome)
+    path(CADD_vep_plugin_indel) 
+    path(CADD_vep_tabix_indel) 
+    path(CADD_vep_plugin_snv) 
+    path(CADD_vep_tabix_snv) 
+    path(dbNSFP_vep_plugin) 
+    path(dbNSFP_vep_tabix)
+    path(python_vep_process)
 
     output:
-    tuple val(sampleId), val(method), path("${sampleId}_${method}.tsv")
+    tuple val(sampleId), path("${sampleId}_annotated.*")
 
     script:
     """
-    vep -i ${sampleId}_${method}.vcf --offline --fork $task.cpus --dir_cache $params.vep_cache --dir_plugins $params.vep_plugins -e --plugin CADD,${CADD_vep_plugin_indel},${CADD_vep_plugin_snv} --plugin gnomADc,${gnomADc_vep_plugin} --pick --tab -o ${sampleId}_${method}.tsv
-    sed -i "/^##.*\$/d" ${sampleId}_${method}.tsv
+    vep -i ${sampleId}_merged_dedup.vcf \
+        --fasta ${reference_genome} \
+        --offline \
+        --dir_cache ${params.vep_cache} \
+        --dir_plugins ${params.vep_plugins} \
+        --fork $task.cpus \
+        --pick_allele \
+        --force_overwrite \
+        --no_stats \
+        --exclude_predicted \
+        --sift b \
+        --polyphen b \
+        --ccds \
+        --symbol \
+        --numbers \
+        --domains \
+        --regulatory \
+        --canonical \
+        --protein \
+        --biotype \
+        --af \
+        --max_af \
+        --pubmed \
+        --uniprot \
+        --mane \
+        --variant_class \
+        --show_ref_allele \
+        --keep_csq \
+        --plugin CADD,${CADD_vep_plugin_indel},${CADD_vep_plugin_snv} \
+        --plugin dbNSFP,${dbNSFP_vep_plugin},"CADD_phred,ClinPred_pred,ClinPred_rankscore,ExAC_AF,FATHMM_pred,HGVSc_VEP,HGVSp_VEP,MutPred_Top5features,MutPred_rankscore,REVEL_rankscore,UK10K_AF,clinvar_MedGen_id,clinvar_OMIM_id" \
+        --fields "IMPACT,CLIN_SIG,Existing_variation,SYMBOL,MANE_SELECT,CDS_position,Codons,Protein_position,Amino_acids,VARIANT_CLASS,BIOTYPE,Feature,CANONICAL,EXON,INTRON,DOMAINS,miRNA,AF,ExAC_AF,MAX_AF,UK10K_AF,SIFT,PolyPhen,CADD_phred,ClinPred_pred,ClinPred_rankscore,FATHMM_pred,MutPred_Top5features,MutPred_rankscore,REVEL_rankscore,clinvar_MedGen_id,clinvar_OMIM_id" \
+        --vcf \
+        -o ${sampleId}_annotated.vcf
+    
+    python3.6 ${python_vep_process} ${sampleId}_annotated.vcf
     """
 }
+
 
 process MERGE_ANNOVAR_FILES {
 /*
@@ -1101,54 +1202,5 @@ OUTPUT INTO
     python ${python_annot} -d . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId} -i ${annotation_dict} -r ${params.run_id} -m merge
     python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
     mv Annotation_${sampleId} ./Annotation_${sampleId}.csv
-    """
-}
-
-process MERGE_VEP_FILES {
-    publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: 'Annotation_*.csv'
-    publishDir "${params.results}/${sampleId}", mode: 'copy', pattern: 'Annotation_*.xlsx'
-
-    input:
-        tuple val(sampleId), val("varscan"), path("varscan_${method}.csv"), val(mutect2), path("mutect2_${method}.csv"), val("gatk"), path("gatk_${method}.csv")
-        path(gatk)
-        path(reference_genome)
-    output:
-        path("*")
-
-    script:
-    """
-
-    """
-}
-
-process CONTROL_FREEC {
-/*
-INPUT
-<
-
-OUTPUT
->
-
-INPUT FROM
-<-
-
-OUTPUT INTO
-->
-*/
-    tag "$sampleId"
-    publishDir "${params.results}/${sampleId}/Variation/CNV", mode: 'copy'
-
-    input:
-        tuple val(sampleId), path("${sampleId}_sorted.bam"), path("${sampleId}_sorted.bam.bai")
-        path(freec_config)
-        path(R_freec_graphics)
-
-    output:
-        path("*")
-
-    script:
-    """
-    freec -conf ${freec_config} -sample ${sampleId}_sorted.bam
-    cat ${R_freec_graphics} | R --slave --args 2 ${sampleId}_sorted.bam_ratio.txt
     """
 }

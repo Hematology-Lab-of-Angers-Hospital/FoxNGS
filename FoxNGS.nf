@@ -76,15 +76,15 @@ include {
     IN_TARGET_MAPPING;
     DUPMARK_BAM_SETUP;
     BQSR_BAM_SETUP;
-    CONTROL_FREEC;
     MPILEUP_SETUP;
+    CONTROL_FREEC;
     COLLECT_HS_METRICS;
     COVERAGE_ANALYSIS;
     PATIENT_REPORT;
     MUTECT2;
     HAPLOTYPECALLER;
-    VEP as VEP_HTC;
-    VEP as VEP_MT2;
+    MERGE_VCF;
+    VEP;
 } from './modules.nf'
 
 // WORKFLOW FUNCTIONS AND PROCESSES CALLING
@@ -105,11 +105,10 @@ workflow {
 
     // FILES SETUP
     // Reference genome and derivatives (indexes, fasta index and dictionary)
-    reference_genome      = file("${params.genome}/GRCh${params.reference_version}/*.fna")
+    reference_genome      = file("${params.genome}/GRCh${params.reference_version}/*.{fna,fasta}")
     reference_index       = file("${params.genome}/GRCh${params.reference_version}/*.{ann,amb,bwt,pac,sa}")
     reference_fai         = file("${params.genome}/GRCh${params.reference_version}/*.fna.fai")
     reference_dict        = file("${params.genome}/GRCh${params.reference_version}/*.dict")
-    variation_dict	  = file("${params.dbsnp}/*.tbi")
     
     // bed files
     bed_bait              = file(params.bed_bait)
@@ -118,10 +117,14 @@ workflow {
     
     // Variation files
     dbsnp                 = file(params.dbsnp)
-    CADD_vep_plugin_indel = file(params.CADD_vep_plugin_indel)
-    CADD_vep_plugin_snv   = file(params.CADD_vep_plugin_snv)
-    dbNSFP_vep_plugin     = file(params.dbNSFP_vep_plugin)
-    gnomADc_vep_plugin    = file(params.gnomADc_vep_plugin)
+    CADD_vep_plugin_indel = file(params.cadd_vep_plugin_indel)
+    CADD_vep_tabix_indel  = file(params.cadd_vep_tabix_indel)
+    CADD_vep_plugin_snv   = file(params.cadd_vep_plugin_snv)
+    CADD_vep_tabix_snv    = file(params.cadd_vep_tabix_snv)
+    dbNSFP_vep_plugin     = file(params.dbnsfp_vep_plugin)
+    dbNSFP_vep_tabix      = file(params.dbnsfp_vep_tabix)
+    gnomADc_vep_plugin    = file(params.gnomadc_vep_plugin)
+    gnomADc_vep_tabix     = file(params.gnomadc_vep_tabix)
 
     //Coverage report templates
     exon_template         = file(params.exon_template)
@@ -136,12 +139,16 @@ workflow {
     freec_config          = file(params.freec_config)
     R_freec_graphics      = file(params.R_freec_graphics)
 
+    // Post annotation filtering
+    python_vep_process    = file(params.python_vep_process)
+
     // DATA PROCESSING
     // Quality control
     QUALITY_CONTROL(fastq_input)
 
     // Indexes setup
     REFERENCE_DICT_SETUP(gatk, reference_genome)
+    VARIATION_INDEX_SETUP(gatk, dbsnp)
     FAI_SETUP(reference_genome)
     BAIT_BED_INTERVAL_SET(picard, bed_bait, "bait", REFERENCE_DICT_SETUP.out)
     EXON_BED_INTERVAL_SET(picard, bed_exon, "exon", REFERENCE_DICT_SETUP.out)
@@ -165,10 +172,11 @@ workflow {
     MAPPED_BAM_SETUP(BAM_SETUP.out)
     IN_TARGET_MAPPING(MAPPED_BAM_SETUP.out, bed_bait)
     DUPMARK_BAM_SETUP(IN_TARGET_MAPPING.out, picard)
-    BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, reference_dict, dbsnp, variation_dict)
+    BQSR_BAM_SETUP(gatk, DUPMARK_BAM_SETUP.out.bam, reference_genome, FAI_SETUP.out, REFERENCE_DICT_SETUP.out, dbsnp, VARIATION_INDEX_SETUP.out)
+    MPILEUP_SETUP(IN_TARGET_MAPPING.out, reference_genome)
 
     // CNV Analysis
-    CONTROL_FREEC(MAPPED_BAM_SETUP.out, freec_config, R_freec_graphics)
+    CONTROL_FREEC(MPILEUP_SETUP.out, freec_config, R_freec_graphics)
 
     // Coverage analysis
     COLLECT_HS_METRICS(picard, MAPPED_BAM_SETUP.out, reference_genome, FAI_SETUP.out, BAIT_BED_INTERVAL_SET.out, EXON_BED_INTERVAL_SET.out)
@@ -184,7 +192,10 @@ workflow {
     patient_report_channel = COVERAGE_ANALYSIS.out.mosdepth_stats.combine(COLLECT_HS_METRICS.out, by: 0)
 
     PATIENT_REPORT(patient_report_channel, bed_hotspots, bed_exon, exon_template, hotspot_template, patient_report_config)
+    
+    variant_channel = MUTECT2.out.combine(HAPLOTYPECALLER.out, by: 0)
+    
+    MERGE_VCF(variant_channel, picard, reference_genome, REFERENCE_DICT_SETUP.out)
 
-    VEP_HTC(HAPLOTYPECALLER.out, CADD_vep_plugin_indel, CADD_vep_plugin_snv, dbNSFP_vep_plugin, gnomADc_vep_plugin)
-    VEP_MT2(MUTECT2.out, CADD_vep_plugin_indel, CADD_vep_plugin_snv, dbNSFP_vep_plugin, gnomADc_vep_plugin)
+    VEP(MERGE_VCF.out, reference_genome, CADD_vep_plugin_indel, CADD_vep_tabix_indel, CADD_vep_plugin_snv, CADD_vep_tabix_snv, dbNSFP_vep_plugin, dbNSFP_vep_tabix, python_vep_process)
 }
