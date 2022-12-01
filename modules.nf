@@ -1073,4 +1073,4 @@ OUTPUT INTO
     python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
     mv Annotation_${sampleId} ./Annotation_${sampleId}.csv
     """
-} 
+}
