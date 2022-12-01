@@ -115,7 +115,8 @@ OUTPUT INTO
 
     script:
     """
-    java -jar ${gatk} CreateSequenceDictionary -R ${reference_genome}
+    java -jar ${gatk} CreateSequenceDictionary \
+        -R ${reference_genome}
     """
 }
 
@@ -231,7 +232,13 @@ OUTPUT INTO
 
 process ANNOTATION_DICTIONNARY_SETUP {
 /*
-process description
+Calls annotation_process to produce a .json dictionnary file of known
+artifacts and favorite transcripts. Allows to tailor
+the filtering process, removing known sequencing artifacts 
+and selecting favorite transcripts.
+
+Used in StageInMode 'copy' to alleviate for file opening issues
+with symlinks in the script.
 
 INPUT
     < python_annot    : Path to the python script building a .json dictionary from
@@ -271,29 +278,35 @@ OUTPUT INTO
 
 process BAM_SETUP {
 /*
-Sets up the bam (binary ve
+Sets up the bam (binary version of the reads mapped to the genome) 
+by calling samtools view and samtools sort. Both are piped together
+to greatly optimize computing time.
 
-rsion of the reads mapped to the genome) 
-by calling samtools view and samtools sort
+Now uses 16 CPUs per process to compensate for alignment bias of bwa-mem
+when CPU allocation changes. 
+Legacy pipeline used 16 CPUs, so will FoxNGS.
 
 INPUTS
-(linked)
+    (linked)
     < sampleId: patient ID value
-    < sam     : path to the sam (Sequence Alignment Map, aligned reads) file 
+    < fastq_r1: path to the r1 fastq.gz file
+    < fastq_r2: path to the r2 fastq.gz file
+
 OUTPUT
-(linked)
+    (linked)
     > sampleId  : patient ID value
-    > sorted_bam: path to the sorted bam file
+    > sorted_bam: path to the bam (Binary Alignment Map, aligned reads in binary setup) file 
+                  with reads sorted by starting position
 
 INPUT FROM
-    <- SAM_SETUP process
+    <- fastq_r1, fastq_r2 : fastq_input channel
 
 OUTPUT INTO
-    -> BAM_SETUP process (sorted_bam)
-    -> STDOUT (mapping stats)
+    -> sampleId, sorted.bam: MAPPED_BAM_SETUP process (sorted_bam)
+    -> mapping_stats       : STDOUT
 */
     tag "${sampleId}"
-    cpus 4
+    cpus 16
 
     input:
         tuple val(sampleId), path(fastq_r1), path(fastq_r2)
@@ -402,7 +415,14 @@ OUTPUT INTO
 
 process DUPMARK_BAM_SETUP {
 /*
-Uses picard to filter duplicates in the on_target bam file
+Uses picard to filter duplicates in the on_target bam file.
+
+As long as GATK variant calling tools do not make a difference 
+in duplicate marking (either modify hexadecimal flag of duplicates or 
+consider additional duplicate flag in duplicate filtering) between optical duplicates 
+and sequencing duplicates due to over amplification in targeted panels, 
+variant callers will have to ignore duplicate marking results in order 
+to increase reference/mutant reporting.
 
 INPUTS
     (linked)
@@ -417,8 +437,8 @@ OUTPUT
 (linked)
     > sampleId       : patient ID value
     > dupmark_bam    : path to binary mapped reads that are sorted, 
-                       off target reads filtered, with marked suplicates
-    > dupmark_bam.bai: path to the dupmark bam index
+                       off target reads filtered, with marked duplicates
+    > dupmark_bam.bai: path to the dupmark_bam index
 
 INPUT FROM
     <- sampleId,on_target_bam,on_target_bam.bai: ON_TARGET_MAPPING process
@@ -453,20 +473,55 @@ OUTPUT INTO
 
 process BQSR_BAM_SETUP {
 /*
+Calls GATK to build a model of base quality covariation, 
+to subsequently apply that model to recalibrate quality
+in the bam file
 
+Uses .vcf of known sites (such as dbsnp) to not affect these positions.
+
+DO NOT USE ON TARGETED PANELS, as these have not enough variation to
+provide a covariate model that has enough relevance for base revalirbation, 
+uselessly driving down the average base quality.
 
 INPUT
-< 
+    < gatk            : path to the GATK toolkit java archive (.jar) file
 
+    (linked)
+    < sampleId        : patient ID value
+    < dupmark_bam     : path to binary mapped reads that are sorted, 
+                        off target reads filtered, with marked duplicates
+    < dupmark_bam.bai : path to the dupmark_bam index
+
+    < reference_genome: path to the reference genome (.fna file)
+    < indexed_genome  : path to the reference genome index (.fna.fai file)
+    < reference_dict  : path to the reference genome dictionary (.dict file)
+    < dbsnp           : path to the reference database of SNP
+    < dbsnp_idx       : path to the dbsnp index
 
 OUTPUT
-> 
+    (linked)
+    > sampleId     : patient ID value
+    > bqsr.bam     : path to the base recalibrated bam file
+    > bqsr.bam.bam : path to the bqsr.bam index
+
+    (linked)
+    > sampleId    : patient ID value
+    > recal_table : table of base recalibrations, produced by the 
+                    BaseRecalibrator GATK function
 
 INPUT FROM
-<- 
+    <- sampleId, dupmark.bam, dupmark.bam.bai : DUPMARK_BAM_SETUP process
+    <- indexed_genome                         : FAI_SETUP process
+    <- reference_dict                         : REFERENCE_DICT_SETUP process
+    <- dbsnp_idx                              : VARIATION_INDEX_SETUP process
+
+    <- gatk                                   : gatk channel
+    <- reference_genome                       : reference_genome channel
+    <- dbsnp                                  : dbsnp channel
 
 OUTPUT INTO
--> 
+    -> sampleId, bqsr.bam, bqsr.bam.bai : HAPLOTYPECALLER process
+    -> sampleId, recal_table            : PATIENT_REPORT process
 */
     input:
     path(gatk)
@@ -501,20 +556,29 @@ OUTPUT INTO
 
 process MPILEUP_SETUP{
 /*
-
+Calls samtools on the bam file (with marked duplicates) 
+to produce a mpileup file
 
 INPUT
-< 
+    (linked)
+    < sampleId       : patient ID value
+    < dupmark_bam    : path to binary mapped reads that are sorted, 
+                       off target reads filtered, with marked duplicates
+    < dupmark_bam.bai: path to the dupmark bam index
 
 
 OUTPUT
-> 
+    (linked)
+    > sampleId: patient ID value
+    > mpileup : 
 
 INPUT FROM
-<- 
+    <- sampleId, dupmark.bam, dupmark.bam.bai: DUPMARK_BAM_SETUP process
+
+    <- reference_genome : reference_gnome channel
 
 OUTPUT INTO
--> 
+    -> sampleId, mpileup : VARSCAN process
 */
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -527,39 +591,43 @@ OUTPUT INTO
     """
     samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
     """
+// ????????
 }
 
 process COLLECT_HS_METRICS {
 /*
 Uses the CollectHSMetrics funtion from the Picard suite to gather multiple
 metrics on coverage, mapping... The output is used in the multiqc report
+The NEAR_DISTANCE is set to 0 so that the selected_reads percentage
+metrics in the output reflects an "in bait"/"on target" metric.
 
 INPUT
-< picard        : path to the Picard java archive file (.jar)\
+    < picard               : path to the Picard java archive file (.jar)\
 
 (linked)
-< sampleId             : patient ID value
-< mapped_sorted.bam    : path to file containing 
-                         the reads correctly mapped on the genome 
-< mapped_sorted.bam.bai: path to the mapped_sorted_bam index
+    < sampleId             : patient ID value
+    < mapped_sorted.bam    : path to file containing 
+                             the reads correctly mapped on the genome 
+    < mapped_sorted.bam.bai: path to the mapped_sorted_bam index
 
-< reference_genome     : path to the reference genome (.fna file)
-< reference_fai        : path to the reference genome index (.fna.fai file)
-< design_interval_list : path to the bait bed converted to an interval list
-< exon_interval_list   : path to the target exon bed converted to an interval list
+    < reference_genome     : path to the reference genome (.fna file)
+    < reference_fai        : path to the reference genome index (.fna.fai file)
+    < design_interval_list : path to the bait bed converted to an interval list
+    < exon_interval_list   : path to the target exon bed converted to an interval list
 
 OUTPUT
-> 
+    > output_hs_metrics  : table of metrics collected by the CollectHsMetrics tool
 
 INPUT FROM
-<- picard                                            : picard value channel
-<- sampleId, mapped_sorted.bam, mapped_sorted.bam.bai: MAPPED_BAM_SETUP process
-<- reference_genome                                  : reference_genome value channel
-<- reference_fai                                     : FAI_SETUP process
-<- design_interval_list, exon_interval_list          : BED_INTERVAL_SETUP process
+    <- sampleId, mapped_sorted.bam, mapped_sorted.bam.bai: MAPPED_BAM_SETUP process
+    <- reference_fai                                     : FAI_SETUP process
+    <- design_interval_list, exon_interval_list          : BED_INTERVAL_SETUP process
+
+    <- picard                                            : picard value channel
+    <- reference_genome                                  : reference_genome value channel
 
 OUTPUT INTO
--> $params.results/$sampleId/Coverage; coverage analysis directory
+    -> $params.results/$sampleId/Coverage: coverage analysis directory
 */
     tag("${sampleId}")
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy'
@@ -655,7 +723,12 @@ process PATIENT_REPORT {
 Intersects a mosdepth exon.per_base coverage file with a hotspots postion file
 to check if these hotspots are covered above 200x. Issues a warning in the file
 named hotspots_warning.txt if any base in the coverage bed has a hospot position
-with a coverage value under 200 
+with a coverage value under 200x.
+
+Used in StageInMode 'copy' to alleviate for file opening issues
+with symlinks when using MultiQC.
+
+Runs in a few seconds thanks to low level scripting.
 
 INPUT
     (linked)
@@ -782,7 +855,7 @@ OUTPUT INTO
         --min-coverage 50 \
         --min-reads2 8 \
         --min-avg-qual 30 \
-        --min-var-freq 0.02 \
+        --min-var-freq 0.0175 \
         --p-value 0.1 \
         --strand-filter 0 \
         --output-vcf \
@@ -794,7 +867,9 @@ OUTPUT INTO
 process MUTECT2 {
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
-using Mutect2 from the GATK software suite
+using Mutect2 from the GATK software suite.
+Duplicate reads filter disabled, see DUPMARK_BAM_SETUP process
+description for more information.
 
 INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
@@ -821,7 +896,7 @@ INPUT FROM
     <- reference_dict                      : REFERENCE_DICT_SETUP process
 
 OUTPUT INTO
-    -> ANNOVAR process
+    -> ANNOVAR process OR VEP process
 */
     tag "${sampleId}"
     cpus 2
@@ -860,6 +935,8 @@ process HAPLOTYPECALLER {
 Calls genome variation in the .bam files (comparing it to the reference genome)
 using HaplotypeCaller from the GATK software suite. Uses dbsnp to filter SNP
 that are reported as non-pathogenic.
+Duplicate reads filter disabled, see DUPMARK_BAM_SETUP process
+description for more information.
 
 INPUT
     < gatk            : path to the GATK toolkit java archive (.jar) file
@@ -893,7 +970,7 @@ INPUT FROM
     <- dbsnp_idx                         : VARIATION_INDEX_SETUP process
 
 OUTPUT INTO
-    -> ANNOVAR process
+    -> ANNOVAR process OR VEP process
 */
     tag "${sampleId}"
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*_recal.table"
@@ -916,7 +993,7 @@ OUTPUT INTO
         -R ${reference_genome} \
         --min-base-quality-score 30 \
         --minimum-mapping-quality 20 \
-        --native-pair-hmm-threads 16 \
+        --native-pair-hmm-threads $task.cpus \
         --disable-read-filter NotDuplicateReadFilter \
         --dont-use-soft-clipped-bases true \
         -O ${sampleId}_haplotypecaller.vcf
@@ -929,7 +1006,10 @@ OUTPUT INTO
 process PINDEL {
 /*
 Calls genome variation in the .bam files (comparing it to the reference genome)
-using pindel to find specific InDel in CALR and FLT3 (hence the bed input)
+using pindel to find specific InDel in CALR and FLT3 (hence the bed input).
+
+Used in StageInMode 'copy' to alleviate for file opening issues
+with symlinks in the Pindel config file.
 
 INPUT
     (linked)
@@ -1081,17 +1161,24 @@ OUTPUT INTO
 process VEP {
 /*
 INPUT
-< 
-
+    (linked)
+< sampleId                      : patient ID value
+    < method                    : method used to annotate the .bam file
+                                                           (Varscan, Mutect2, Hapotypecaller (GATK) or Pindel)
+    < ${sampleId}_${method}.vcf : path to the vcf corresponding to the sampleId and
+                                  method used
 
 OUTPUT
-> 
+    (linked)
+    > sampleId                  : patient ID value
+    > method                    : method used to annotate the .bam file
+    > ${sampleId}_${method}.csv : comma separated values (.csv) file containing annotated variants
 
 INPUT FROM
 <- 
 
 OUTPUT INTO
--> 
+-> MERGE_VEP_FILES
 */
     cpus 4
     tag "${sampleId}"
@@ -1149,6 +1236,7 @@ OUTPUT INTO
     
     python3.6 ${python_vep_process} ${sampleId}_annotated.vcf
     """
+// TODO : expand with plugins
 }
 
 
@@ -1183,6 +1271,8 @@ INPUT FROM
 
 OUTPUT INTO
     -> MERGE_ANNOVAR_FILES
+
+// Possible improvement: annotation of a variable number of variant callers
 */
     tag "${sampleId}"
     publishDir "${params.results}/${sampleId}/Variation", mode: 'copy', pattern: 'Annotation_*.csv'

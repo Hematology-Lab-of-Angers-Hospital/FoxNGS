@@ -42,7 +42,6 @@ def helpMessage() {
         Profiles (On local executor)
             ${ANSI_RED}normal${ANSI_GREEN} : 8 CPU
             ${ANSI_RED}fast${ANSI_GREEN} : 16 CPU
-            ${ANSI_RED}urgent${ANSI_GREEN} : 46 CPU
         
         pipeline insight
             ${ANSI_RED}-with-report${ANSI_GREEN} for a complete report on ressource attribution/usage
@@ -52,6 +51,8 @@ def helpMessage() {
         pipeline restart
             If for some reason the pipeline has failes and you need to restart it
             Use ${ANSI_RED}-resume${ANSI_GREEN} in the command to call cached processes
+
+        See NextFlow documentation on (nextflow.io/docs)
     ${ANSI_RESET}""".stripIndent()
 }
 
@@ -105,11 +106,10 @@ workflow {
 
     // FILES SETUP
     // Reference genome and derivatives (indexes, fasta index and dictionary)
-    reference_genome      = file("${params.genome}/GRCh${params.reference_version}/*.{fna,fasta}")
-    reference_index       = file("${params.genome}/GRCh${params.reference_version}/*.{ann,amb,bwt,pac,sa}")
+    reference_genome      = file("${params.genome}/GRCh${params.reference_version}/*.fna")
+    reference_index       = file("${params.index}/*.{ann,amb,bwt,pac,sa}")
     reference_fai         = file("${params.genome}/GRCh${params.reference_version}/*.fna.fai")
     reference_dict        = file("${params.genome}/GRCh${params.reference_version}/*.dict")
-    
     // bed files
     bed_bait              = file(params.bed_bait)
     bed_exon              = file(params.bed_exon)
