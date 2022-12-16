@@ -314,8 +314,9 @@ OUTPUT INTO
         tuple path(amb), path(ann), path(bwt), path(pac), path(sa)
 
     output:
-        tuple val(sampleId), path("${sampleId}_sorted.bam")
-        
+        tuple val(sampleId), path("${sampleId}_sorted.bam"), emit: bam
+        stdout emit: mapping_stats
+
     script:
     """
     bwa mem -t $task.cpus -j -R "@RG\\tID:C5-${sampleId}\\tPL:illumina\\tPU:HXXX\\tLB:Solexa\\tSM:C5-${sampleId}" ${reference_genome} ${fastq_r1} ${fastq_r2} | samtools sort -@ ${task.cpus} -O BAM -o ${sampleId}_sorted.bam
@@ -323,6 +324,8 @@ OUTPUT INTO
     mapped_reads=`samtools view -h -c ${sampleId}_sorted.bam`
     unmapped_reads=`samtools view -f 0x4 -h -@ $task.cpus -c -b ${sampleId}_sorted.bam`
     chimeric_reads=`samtools view  -f 0x800 -h -@ $task.cpus -c -b ${sampleId}_sorted.bam`
+
+    echo "${sampleId}\nMapped:\$mapped_reads\nUnmapped:\$unmapped_reads\nChimeric:\$chimeric_reads"
     """
 }
 
@@ -711,7 +714,7 @@ OUTPUT INTO
     """
     samtools flagstat -@ $task.cpus ${sampleId}_in_target.bam > ${sampleId}_in_target_stats
     
-    mosdepth ${sampleId}_in_target -b ${bed_bait} ${sampleId}_mapped_sorted.bam -t $task.cpus
+    MOSDEPTH_PRECISION=4 mosdepth ${sampleId}_in_target -b ${bed_bait} ${sampleId}_mapped_sorted.bam -t $task.cpus
 
     mosdepth ${sampleId}_exon -b ${bed_exon} ${sampleId}_in_target.bam -t $task.cpus
     """
@@ -751,7 +754,7 @@ OUTPUT INTO
     stageInMode 'copy'
 
     input:
-        tuple val(sampleId), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_in_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_output_hs_metrics.txt")
+        tuple val(sampleId), path("${sampleId}_recal.table"), path("${sampleId}_exon.per-base.bed.gz"), path("${sampleId}_in_target.mosdepth.region.dist.txt"), path("${sampleId}_exon.mosdepth.region.dist.txt"), path("${sampleId}_exon.regions.bed.gz"), path("${sampleId}_output_hs_metrics.txt")
         path(bed_hotspots)
         path(bed_exon)
         path(exon_template)
@@ -760,6 +763,7 @@ OUTPUT INTO
 
     output:
         path("${sampleId}_report.html")
+        env(patient_stats), emit: patient_stats
 
     script:
     """
@@ -771,7 +775,13 @@ OUTPUT INTO
     bedtools intersect -a ${bed_hotspots} -b ${sampleId}_exon.per-base.bed -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{ if(\$4 < 200) print NR,\$3,\$1,\$2,\$4 }' | sed 's/,/-/3' >> ${sampleId}_hotspot_coverage_mqc.csv
     bedtools intersect -a ${sampleId}_exon.per-base.bed -b ${bed_exon} -wb | cut -f 2,3,4,8 | awk -F '\t' -v OFS=',' '{if(\$3 < 200) print \$4}' | uniq -c | sed -e 's/^[ \t]*//' | sed -e "s/ /,/g" | awk -F ',' -v OFS=',' '{print \$2,\$1}' >> ${sampleId}_exon_coverage_mqc.csv
 
-    multiqc . -c ${patient_report_config} -n ${sampleId}_report.html
+    multiqc . -q -c ${patient_report_config} -n ${sampleId}_report.html
+
+    in_target=`echo \$(grep 'bait_list\\s' ${sampleId}_output_hs_metrics.txt | cut -f 7 | sed s/,/./)*100 | bc -l`
+    coverage=`grep 'bait_list\\s' ${sampleId}_output_hs_metrics.txt | cut -f 34 | sed s/,/./`
+    bases_over_200x=`echo \$(grep 'total\\s200\\s' ${sampleId}_in_target.mosdepth.region.dist.txt | cut -f 3)*100 | bc -l`
+    
+    patient_stats=\$(echo "${sampleId},\${bases_over_200x%.*},\${coverage%.*},\$in_target\\n")
     """
 }
 
@@ -918,7 +928,6 @@ OUTPUT INTO
         -R ${reference_genome} \
         --min-base-quality-score 30 \
         --dont-use-soft-clipped-bases true \
-        --disable-read-filter NotDuplicateReadFilter \
         --native-pair-hmm-threads 16 \
         -O ${sampleId}_mutect2.vcf.gz
 
@@ -928,7 +937,7 @@ OUTPUT INTO
         -O ${sampleId}_mutect2.vcf
 
 	java -jar ${gatk} Mutect2 \
-        -I ${sampleId}_dupmark.bam \
+        -I ${sampleId}_bqsr.bam \
         -R ${reference_genome} \
         --min-base-quality-score 30 \
         --dont-use-soft-clipped-bases true \
@@ -1008,7 +1017,6 @@ OUTPUT INTO
         --min-base-quality-score 30 \
         --minimum-mapping-quality 20 \
         --native-pair-hmm-threads $task.cpus \
-        --disable-read-filter NotDuplicateReadFilter \
         --dont-use-soft-clipped-bases true \
         -O ${sampleId}_haplotypecaller.vcf
 
@@ -1250,7 +1258,6 @@ OUTPUT INTO
     
     python3.6 ${python_vep_process} ${sampleId}_annotated.vcf
     """
-// TODO : expand with plugins
 }
 
 
@@ -1304,7 +1311,7 @@ OUTPUT INTO
     script:
     """
     python ${python_annot} -d . -f Filter_simple_annotation_${sampleId}_varscan.csv,Filter_simple_annotation_${sampleId}_mutect2.csv,Filter_simple_annotation_${sampleId}_gatk.csv,Filter_simple_annotation_${sampleId}_pindel.csv -o variants_${sampleId} -i ${annotation_dict} -r ${params.run_id} -m merge
-    python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
-    mv Annotation_${sampleId} ./Annotation_${sampleId}.csv
+    python ${python_annot} -d . -f Final_variants_${sampleId}.csv -o Annotation_patient_${sampleId} -i ${annotation_dict} -m statistics -s ${stats_dict}
+    mv Annotation_patient_${sampleId} ./Annotation_patient_${sampleId}.csv
     """
 }
