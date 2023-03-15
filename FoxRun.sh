@@ -23,6 +23,7 @@ function CHOIX_IDENTIFIANT (){
 	echo -e "************"
 	echo -e "Rentrez Identifiant patient ou la selection de patient (STOP pour arreter le programme)"
 	read patient
+	IFS=',' read -r -a $patients_analyses <<< $patient
 	echo -e "************"
 }
 
@@ -31,6 +32,8 @@ function CHOIX_ANALYSE () {
 	echo "***********************************"
 	echo -e "Choix 1 : Demultiplexage (1ère étape : Preparation des fichiers FASTQ par patient)\n"
 	echo -e "Choix 2 : Analyse (2ème étape : Lancement de l'analyse par patient \n du fichier brute à la création du rapport (Combinaison du choix 2 à 4))\n"
+	echo -e "Choix 3 : All (Demultiplexage + Analyse)\n"
+	echo -e "Choix 0 - Retour"
 	echo "***********************************"
 	echo "Entrez le nom du choix. (Exemple All)  "
 	echo "Quel analyse souhaitez vous effectuer ? "
@@ -41,8 +44,15 @@ function CHOIX_ANALYSE () {
 
 function CREATION_RECHERCHE_FILE () {
 	ANALYSIS_FOLDER=${RUN}/${SORTIE}
-	mkdir $ANALYSIS_FOLDER
-    mkdir $ANALYSIS_FOLDER/fastq
+	create_new_folders=$1
+
+	if [ "$create_new_folders" -eq "1" ];
+	then
+		mkdir $ANALYSIS_FOLDER
+    	mkdir $ANALYSIS_FOLDER/fastq
+		mkdir $ANALYSIS_FOLDER/results
+		mkdir $ANALYSIS_FOLDER/results/reports
+	fi
 
 	LOG=$ANALYSIS_FOLDER/log_lancement_FoxNGS_Routine_v1_2_b.txt
 	# Recherche automatique des fichiers brutes
@@ -52,8 +62,56 @@ function CREATION_RECHERCHE_FILE () {
 	BCL=$RUN/$foldernamebcl
 	# Récupération du fichier du RUN contenant les échantillons
 	# Note : Ce fichier doit contenir le nom du run
-	TPL=$BCL/SureSelect_QXT_$NAME_RUN.csv
-	CAT $TPL
+	TPL=$BCL/*.csv
+}
+
+function VERIFY_FILE () {
+	file=$1
+	# Fonction qui verifie si le fichier existe
+
+	# Si le fichier n'exite pa ou il est vide : Creation du dictionnaire
+	if test -f $file ;
+		then
+		echo 1
+	# S'il n'existe pas arret du programme
+	else
+		echo 0
+	fi
+
+}
+
+function CHECK_FASTQ () {
+	path=$1
+	samplesheet=$2
+	return=1
+
+	for name in $(cut -d "," -f1 $samplesheet | grep -e "-");
+		do
+		for R in 1 2;
+			do
+				if test -f ${path}/${name}_S*_R${R}_001.fastq.gz;
+				then
+					return=0
+					((R++))
+				else
+					return=1
+					break 2
+				fi
+			done
+		done
+}
+
+function NETTOYAGE () {
+	echo -e "Le nottoyage des processus supprimerait $(nextflow clean -n | wc -l) files\n"
+	echo "Souhaitez-vous effectuer le nettoyage des fichiers intermédiaires ?\n"
+	echo -e "Choix 1 : Oui\n"
+	echo -e "Choix 0 : Non\n" 
+	echo "********"
+	read nettoyage
+	if [[ "$nettoyage" -eq "1" ]];
+	then
+		/home/tfli-0070/BioNGSTools/nextflow clean -f;
+	fi
 }
 
 function PREPARATION_FASTQ () {
@@ -62,7 +120,8 @@ function PREPARATION_FASTQ () {
 	date >> $LOG                                            
 	echo "Lancement bcl2fastq" >> $LOG
     echo -e "singularity exec -B /media/tfli-0070/DATASAVE1 /home/tfli-0070/BioNGSTools/Singularity_database/bcl2fastq_docker.sif bcl2fastq --runfolder $BCL --output-dir $ANALYSIS_FOLDER/fastq --sample-sheet $TPL --use-bases-mask Y150,I8,I8,Y150 --no-lane-splitting -r 32 -p 32 -w 32" >> $LOG
-    singularity exec -B /media/tfli-0070/DATASAVE1 /home/tfli-0070/BioNGSTools/Singularity_database/bcl2fastq_docker.sif bcl2fastq --runfolder $BCL --output-dir $ANALYSIS_FOLDER/fastq --sample-sheet $TPL --use-bases-mask Y150,I8,I8,Y150 --no-lane-splitting -r 32 -p 32 -w 32 
+	singularity exec -B /media/tfli-0070/DATASAVE1 /home/tfli-0070/BioNGSTools/Singularity_database/bcl2fastq_docker.sif bcl2fastq --runfolder $BCL/ --output-dir $ANALYSIS_FOLDER/fastq --sample-sheet $TPL --use-bases-mask Y150,I8,I8,Y150 --no-lane-splitting -r 32 -p 32 -w 32
+	cp $ANALYSIS_FOLDER/fastq/{Reports,Stats}/ $ANALYSIS_FOLDER/results/reports 
 	echo "FIN bcl2fastq" >> $LOG
 	date >> $LOG
 	echo -e "**********************************************************************\n" >> $LOG
@@ -102,7 +161,14 @@ function INTERFACE () {
 	echo "********" 
 	read SORTIE
 	# Recuperation de la localisation des fichiers d'interet
-	CREATION_RECHERCHE_FILE
+	if [ ! -d $SORTIE ]
+	then
+		echo "Creating new results folders"
+		CREATION_RECHERCHE_FILE 1
+	else
+		echo "Results folder found"
+		CREATION_RECHERCHE_FILE 0
+	fi
 	echo "********"
 	echo "***********************************"
 	# Choix du génome de référence
@@ -111,29 +177,47 @@ function INTERFACE () {
 	REFERENCE="DEFAULT"
 	# Choix de l'Analyse du Pipeline
 	CHOIX_ANALYSE
+
+	if [ "$ANALYSE" = "0" ];
+		then
+		INTERFACE
+	fi
+
 	# Choix de la portée de l'analyse
     echo "***********************************"
-    echo "Voulez vous lancer l'analyse sur tous les patients ou sur un patient?"
-    echo -e "Choix 1 - All (Analyse demandé Sur tous les patients du RUN sélectioné\n" 
+	listepatient=$(cut -d "," -f1 $TPL | grep -e "[-]") 
+	echo -e "Liste des patients dans le $RUN:\n${listepatient}" 
+    echo -e "\n Voulez vous lancer l'analyse sur tous les patients ou sur un patient?"
+    echo -e "Choix 1 - All (Analyse demandé Sur tous les patients du RUN\n" 
     echo -e "Choix 2 - Unique (Une analyse sur 1 patient \nou une selection de plusieurs patients délimité par des,)\n Choix des patients dessous\n"
-    echo -e "Rentrez le nom du choix (Exemple : All)"
+    echo -e "Choix 0 - Retour\n"
+	echo -e "Rentrez le nom du choix (Exemple : 1)"
     echo "***********************************"
     read SELECTION
+
+	if [ "$SELECTION" = "0" ];
+		then
+		CHOIX_ANALYSE
+	fi
+
+	if [ "$ANALYSE" = "0" ];
+		then
+		INTERFACE
+	fi
 }
 
 function LANCEMENT_ANALYSE_PATIENT () {
 	# Fonction Demultiplexage only
-	if [ "$ANALYSE" = "Demultiplexage" ]; then
+	if [ "$ANALYSE" = "1" ] || [[ $ANALYSE = "3" && $demultiplexage -eq 0 ]]; then
 		echo "Lancement bcl2fastq pour $ANALYSE" >> $LOG
 		PREPARATION_FASTQ
 		# Sortie du programme
 		date >> $LOG
-		exit 0
+		$demultiplexage=1
 	# Recuperation du dernier dictionnaire avant le lancement du RUN
 	# Idée partir d'une même pour les patients lancés en même temps
-	elif [ "$ANALYSE" = "All" ] ; then
-		python3 $DICTIONNARY -o $DICT -s True -outstat $STAT_DICT
-		VERIFY_FILE $STAT_DICT
+	elif [ "$ANALYSE" = "2" ] ; then
+		echo -e "Passage en mode analyse après sélection des patient.\n"
 	else
 		echo "Aucune preanalyse a effectué pour : $ANALYSE" >> $LOG
 	fi
@@ -141,45 +225,43 @@ function LANCEMENT_ANALYSE_PATIENT () {
 	# Lancement du code 
 	# *****************************
 	# Si l'utilisateur travaille sur tous les patients du RUN
-	if [ "$SELECTION" = "All" ]
+	if [ "$SELECTION" = "1" ]
 		then
-
-		for name in $(cut -d "," -f1 $TPL | grep -e "-") 
-		do
             date >> $LOG
             echo -e "DEBUT ANALYSE NGS COMPLETE"
 			echo -e "DEBUT ANALYSE NGS COMPLETE" >> $LOG
             #COMMANDE FOXNGS
-            #nextflow run /home/tfli-0070/Bureau/Data/Recherche/Pipeline/SMPHD_Routine/FoxNGS.nf -profile fast -w /media/tfli-0070/DATASAVE2/work --reads ../fastq --results ../results -with-report -with-timeline
-            # mv timeline.html ../results/reports
-            # mv report.html ../results/reports
-            # multiqc ../results -o ../results/reports
+            /home/tfli-0070/BioNGSTools/nextflow run /home/tfli-0070/Bureau/Data/Recherche/Pipeline/SMPHD_Routine/FoxNGS.nf -profile fast -w /media/tfli-0070/DATASAVE2/work --reads $ANALYSIS_FOLDER/fastq --results $ANALYSIS_FOLDER/results -with-report -with-timeline
             echo -e "FIN ANALYSE NGS COMPLETE"
             echo -e "DEBUT ANALYSE NGS COMPLETE" >> $LOG
 			date >> $LOG
-		done
-		echo "Vous avez analysé $i patient pour l'analyse ${ANALYSE}:" >> $LOG	
 		echo -e "**********************************************************************\n" >> $LOG
 	# *****************************
 	# Si l'utilisateur travaille sur un patient ou une liste de patients en particulier
-	elif [ "$SELECTION" = "Unique" ]; then
+	elif [ "$SELECTION" = "2" ]; then
 		# Choix des identifiants du patients
-		CHOIX_IDENTIFIANT
-		while test "$patient" != "STOP" ; do
+		mkdir ./fastq/tmp
+		patients_analyses=()
+
+		while [[ "$patients_analyses" =~ "STOP" ]]; do
 			listepatient=$(echo $patient | tr "," "\n")
-
-			for namer in $listepatient;
-			
-			do
-				name=$(cut -d "," -f1 $TPL | grep -e "^${namer}");
-				echo "ANALYSE ${name}:";
-				echo "ANALYSE ${name}:" >> $LOG;
-
-				echo -e "************\n FIN ANALYSE\n************"
-			done
-			# Relancement du choix des identifiants
 			CHOIX_IDENTIFIANT
+			
+			for unique_patient in ${patients_analyses[@]};
+			do
+				echo $name
+				cp ./fastq/${unique_patient}_S*_R{1,2}_001.fastq.gz ./fastq/tmp
+			done
 		done
+
+		for unique_patient in ${patients_analyses[@]};
+		do
+			echo $name
+			cp ./fastq/${unique_patient}_S*_R{1,2}_001.fastq.gz ./fastq/tmp
+		done
+
+		echo -e "************\n FIN ANALYSE\n************"
+		/home/tfli-0070/BioNGSTools/nextflow run /home/tfli-0070/Bureau/Data/Recherche/Pipeline/SMPHD_Routine/FoxNGS.nf -profile fast -w /media/tfli-0070/DATASAVE2/work --reads ./tmp_fastq --results ./results -with-report -with-timeline
 	# *****************************
 	# Error of variable selection
 	else
@@ -190,14 +272,22 @@ function LANCEMENT_ANALYSE_PATIENT () {
 	echo -e "***********\nEnd of program\n***********"
 }
 
+function RAPPORTS_QUALITE () {
+	mv timeline.html ../results/reports
+    mv report.html ../results/reports
+	multiqc ./results -o ./results/repots
+}
+
 function MAIN () {
-#    mkdir ../fastq
-#    mkdir ../results ../results/reports
+	demultiplexage=0
     INTERFACE
     LANCEMENT_ANALYSE_PATIENT
-#    nextflow clean -f;
-#    awk -i inplace '{gsub(/\\n/,"\n")}1' ../results/Statistic_couverture.csv; sed -i /^$/d ../results/Statistic_couverture.csv
+	RAPPORTS_QUALITE
+	NETTOYAGE
 }
 
 MAIN
 exit 0
+
+#    nextflow clean -f;
+#    awk -i inplace '{gsub(/\\n/,"\n")}1' ../results/Statistic_couverture.csv; sed -i /^$/d ../results/Statistic_couverture.csv

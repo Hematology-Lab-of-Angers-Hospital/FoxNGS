@@ -1,0 +1,151 @@
+\documentclass{letter}
+\usepackage{chngpage}
+\usepackage{enumitem}
+\usepackage{geometry}
+ \geometry{
+ a4paper,
+ total={210mm,297mm},
+ left=20mm,
+ top=20mm,
+ right=20mm,
+ bottom=20mm
+ }
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[utf8]{inputenc}
+\usepackage[scaled]{helvet}
+\usepackage{tabularx}
+
+\title{NGS Report 1-0-a}
+\author{Joris Argentin}
+\date{January 2023}
+
+\input{variables.tex}
+
+\newcommand\tab[1][0.5cm]{\hspace*{#1}}
+
+\renewcommand\familydefault{\sfdefault}
+
+\begin{document}
+    \begin{minipage}[t][3cm]{0.5\textwidth}
+        \vspace{0pt}
+        \includegraphics[height=2.5cm]{logo-chu.png}
+    \end{minipage}    
+    \begin{minipage}[t]{0.5\textwidth}
+        \vspace{0pt}
+        \begin{tabular}{@{}l@{}}CHU d'Angers\tab Laboratoire d'H\'ematologie - Pr Valérie Ugo \\
+        UF Biologie Moléculaire - Dr Odile Blanchet \\
+        Dr Damien Luque Paz - Dr Anne Bouvier - Dr Laurane Cottin \\
+        4, Rue Larrey 49000 Angers \\
+        Tel. secr\'etariat : 0241355353\end{tabular}
+    \end{minipage}
+
+\medskip
+
+    \fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{\centering \textbf{RECHERCHE DE MUTATIONS DANS LES HEMOPATHIES MYELOIDES PAR SEQUENCAGE DE NOUVELLE GENERATION}}}
+
+    \begin{flushright}
+        \Agent \\
+        \Prescripteur
+    \end{flushright}
+
+    \noindent\begin{tabularx}{\linewidth}{@{}>{\hsize=.5\hsize}X|>{\hsize=.5\hsize}X@{}}
+
+    \textbf{Identit\'e}
+    
+        \begin{itemize}[label={}]
+            \item Nom : \PatientNom
+            \item Pr\'enom : \PatientPrenom
+            \item Date de naissance : \PatientDDN
+            \item Sexe : \PatientSexe
+        \end{itemize}   
+    &
+        \textbf{Informations cliniques}
+        
+        \begin{itemize}[label={}]
+            \item Date de prescription : \Datedeprescription
+            \item Date de pr\'el\`evemement : \Datepvt
+            \item Type de pr\'el\`evement : \BMHVARIABLEMAT
+            \item Taux de Blaste : \Tauxdeblastes\%
+            \item Stade de la maladie : \Pathologie
+        \end{itemize}
+    \end{tabularx}
+
+    \textbf{Indication} :\\
+    \IndicationNGS
+
+    \bigskip
+
+    {\large\textbf{Variation} :}
+    
+    \smallskip
+    \begin{center}
+        \begin{adjustwidth}{-1cm}{-1cm}
+            \begin{tabularx}{\linewidth}{| c | c | X | X | X | c | c | c |}
+                \hline
+                G\`ene & Transcrit & Variant (c.) & Variant (p.) & Classification & VAF (\%) & Profondeur & Annotation \\
+                \hline
+            \end{tabularx}
+        \end{adjustwidth}
+    \end{center}
+
+    \bigskip
+    
+    \textbf{Conclusion} : \\
+    
+    \smallskip
+    
+    \TextField[multiline, bordercolor={}, backgroundcolor={}, width=0.90\linewidth,
+    height=5\baselineskip]{ }
+
+    \medskip
+
+
+    Dr Damien Luque Paz \tab \tab Dr Anne Bouvier \tab \tab \tab \tab Dr Laurane Cottin
+    
+    \newpage
+    
+    \textbf{S\'equençage NGS}
+    \begin{itemize}[label={}]
+        \item Librairie : \NGSLibrairie
+        \item Sequenceur : \NGSSequenceur
+    \end{itemize}
+
+    \bigskip
+
+    \textbf{Analyse Bioinformatique : FoxNGS-H, v\BioinfoFoxNGSVersion}
+    \begin{itemize}[label={}]
+        \item Genome de reference : \BioinfoGenome
+        \item Demultiplexage : \BioinfoDemultiplexingTool, v\BioinfoDemultiplexingVersion
+        \item Alignement : \BioinfoAlignmentTool, v\BioinfoAlignmentVersion
+        \item Appel de variants : 
+        \begin{itemize}
+            \item \BioinfoVariantCallingATool, v.\BioinfoVariantCallingAVersion
+            \item \BioinfoVariantCallingBTool, v.\BioinfoVariantCallingBVersion
+            \item \BioinfoVariantCallingCTool,  v.\BioinfoVariantCallingCVersion
+            \item\BioinfoVariantCallingDTool, v.\BioinfoVariantCallingDVersion
+        \end{itemize}
+        \item Classification : \BioinfoClassificationTool (\BioinfoClassificationVersion)
+        \item Annotation : \BioinfoAnnotationList
+        \item Seuil de d\'etection : Fr\'equence all\'elique : \BioinfoSeuilVAF\%
+    \end{itemize}
+        \begin{center}
+            Les variants avec une fr\'equence all\'elique $\geq$ \BioinfoSeuilVAF\% \\
+            Les variants consid\'er\'es comme des polymorphismes rares (MAF $\geq$ \BioinfoSeuilPolymorphism\%) ne sont pas report\'es
+        \end{center}
+
+    \bigskip
+    
+    \textbf{Information}
+
+    Panel de g\`enes :
+    
+    \fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{ABL1, ACD, ANKRD26, ASXL1, ASXL2, ATM, ATRX, BCL11A, BCOR, BCORL1, CALR, CBL, CEBPa, CHEK2, CSF3R, CTCF, CUX1, DDX41, DNMT3A, DOT1L, EED, ETNK1, ETV6, EZH2, FBXW7, FLT3, GATA1, GATA2, GNAS, HMGA2, HRAS, IDH1, IDH2, IKZF1, JAK1, JAK2, KDM6A, KIT, KMT2A, KMT2B, KMT2C, KMT2D, KRAS, MAD1L1, MPL, NF1, NFE2, NOTCH1, NPM1, NRAS, PAX5, PDS5B, PHF6, PPM1D, PTEN, PTPN11, RAD21, RUNX1, SETBP1, SF3B1, SH2B3, SMC1A, SMC3, SRP72, SRSF2, STAG1, STAG2, SUZ12, TERC, TERT, TET2, TP53, U2AF1, U2AF2, UBA1, WT1, ZBTB33, ZRSR2}}
+    
+    Tous les g\`enes du panel ont \'et\'e analys\'es.
+    
+    Profondeur m\'ediane de s\'equençage : \MedianDepth x \tab Couverture $\ge$200x par position : \CoverageSEQDeuxCentX\%
+    
+    Compte rendu NGS, version du 16/02/2023
+
+\end{document}

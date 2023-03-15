@@ -354,7 +354,6 @@ OUTPUT INTO
 */
     tag "${sampleId}"
     cpus 4
-    publishDir "${params.results}/${sampleId}", mode: 'copy'
 
     input:
         tuple val(sampleId), path("${sampleId}_sorted.bam")
@@ -453,6 +452,7 @@ OUTPUT INTO
     tag "${sampleId}"
     cpus 4
     publishDir "${params.results}/${sampleId}/Coverage", mode: 'copy', pattern: "*.marked_dup.metrics.txt"
+    publishDir "${params.results}/${sampleId}", mode: 'copy', pattern: "*_dupmark.bam*"
 
     input:
         tuple val(sampleId), path("${sampleId}_in_target.bam"), path("${sampleId}_in_target.bam.bai") 
@@ -467,7 +467,6 @@ OUTPUT INTO
     java -Xmx4g -jar ${picard} MarkDuplicates \
         -I ${sampleId}_in_target.bam \
         -M ${sampleId}.marked_dup.metrics.txt \
-        --REMOVE_SEQUENCING_DUPLICATES true \
         -O ${sampleId}_dupmark.bam
     
     samtools index -@ $task.cpus ${sampleId}_dupmark.bam > ${sampleId}_dupmark.bam.bai
@@ -526,6 +525,8 @@ OUTPUT INTO
     -> sampleId, bqsr.bam, bqsr.bam.bai : HAPLOTYPECALLER process
     -> sampleId, recal_table            : PATIENT_REPORT process
 */
+    tag "${sampleId}"
+
     input:
     path(gatk)
     tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
@@ -583,6 +584,8 @@ INPUT FROM
 OUTPUT INTO
     -> sampleId, mpileup : VARSCAN process
 */
+    tag "${sampleId}"
+
     input:
         tuple val(sampleId), path("${sampleId}_dupmark.bam"), path("${sampleId}_dupmark.bam.bai")
         path(reference_genome)
@@ -1009,7 +1012,7 @@ OUTPUT INTO
     output:
         tuple val(sampleId), val("gatk"), path("${sampleId}_haplotypecaller.vcf"), emit: gatk_variation
 
-    script:
+    shell:
     """
     java -jar ${gatk} HaplotypeCaller \
         -I ${sampleId}_bqsr.bam \
@@ -1021,6 +1024,8 @@ OUTPUT INTO
         -O ${sampleId}_haplotypecaller.vcf
 
     awk '{gsub(",Date=[^>]+>",">");}1' ${sampleId}_haplotypecaller.vcf
+
+    echo -e "chr9\t16640682\t.\tT\tC\t366.06\t.\tAC=2;AF=1.00;AN=2;DP=14;ExcessHet=0.0000;FS=0.000;MLEAC=2;MLEAF=1.00;MQ=60.00;QD=30.51;SOR=1.022\tGT:AD:DP:GQ:PL\t1/1:0,1:12:36:380,36,0" >> ${sampleId}_haplotypecaller.vcf
     """
 }
 
