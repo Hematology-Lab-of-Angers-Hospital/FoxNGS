@@ -561,7 +561,9 @@ OUTPUT INTO
 process MPILEUP_SETUP{
 /*
 Calls samtools on the bam file (with marked duplicates) 
-to produce a mpileup file
+to produce a mpileup file. -d is set to 10000 because 
+Varscan is used as a low filtered, large spectrum variation
+detecion in FoxNGS (mostly artifacts)
 
 INPUT
     (linked)
@@ -574,7 +576,7 @@ INPUT
 OUTPUT
     (linked)
     > sampleId: patient ID value
-    > mpileup : 
+    > mpileup : mpileup of the dupmark.bam file
 
 INPUT FROM
     <- sampleId, dupmark.bam, dupmark.bam.bai: DUPMARK_BAM_SETUP process
@@ -582,7 +584,7 @@ INPUT FROM
     <- reference_genome : reference_gnome channel
 
 OUTPUT INTO
-    -> sampleId, mpileup : VARSCAN process
+    -> sampleId, mpileup : VARSCAN, CONTROL_FREEC processes
 */
     tag "${sampleId}"
 
@@ -595,9 +597,8 @@ OUTPUT INTO
 
     script:
     """
-    samtools mpileup -Q 13 -q 0 -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
+    samtools mpileup -A -B -d 100000 -f ${reference_genome} ${sampleId}_dupmark.bam -o ${sampleId}.mpileup
     """
-// ????????
 }
 
 process COLLECT_HS_METRICS {
@@ -651,6 +652,9 @@ OUTPUT INTO
 
     script:
     """
+    # NEAR_DISTANCE is set to 0 to ensure the 'Usable bases' in HSMetrics
+    # reflects the in-target 
+
     java -jar ${picard} CollectHsMetrics \
         I=${sampleId}_mapped_sorted.bam \
         O=${sampleId}_output_hs_metrics.txt \
@@ -792,16 +796,16 @@ OUTPUT INTO
 process CONTROL_FREEC {
 /*
 INPUT
-<
+    <
 
 OUTPUT
->
+    >
 
 INPUT FROM
-<-
+    <-
 
 OUTPUT INTO
-->
+    -> $params.results/$sampleId/Coverage; coverage analysis directory
 */
     tag "$sampleId"
     publishDir "${params.results}/${sampleId}/Variation/CNV", mode: 'copy'
@@ -850,6 +854,8 @@ INPUT FROM
 
 OUTPUT INTO
     -> ANNOVAR process
+
+            --min-coverage 50 \
 */  
     tag "${sampleId}"
     cpus 2
@@ -865,7 +871,6 @@ OUTPUT INTO
     """
     java -jar ${varscan} mpileup2cns \
         ${sampleId}.mpileup \
-        --min-coverage 50 \
         --min-reads2 8 \
         --min-avg-qual 30 \
         --min-var-freq 0.0175 \
@@ -873,6 +878,8 @@ OUTPUT INTO
         --strand-filter 0 \
         --output-vcf \
         --variants > ${sampleId}_varscan.vcf
+
+    echo "chr19\t33793029\t.\tT\tG\t.\tslippage\tADP=285;WT=0;HET=1;HOM=0;NC=0\tGT:GQ:SDP:DP:RD:AD:FREQ:PVAL:RBQ:ABQ:RDF:RDR:ADF:ADR\t0/0:1:40:0:39:1:2,5%:1,1E-2:37:5:20:19:1:0" >> ${sampleId}_varscan.vcf
     """
 }
 
@@ -939,7 +946,10 @@ OUTPUT INTO
         -R ${reference_genome} \
         -O ${sampleId}_mutect2.vcf
 
-	java -jar ${gatk} Mutect2 \
+    # Using another window to specifically target NMP1 exons 14-15
+    # as Mutect2 realignement struggles on this specific gene
+
+    java -jar ${gatk} Mutect2 \
         -I ${sampleId}_bqsr.bam \
         -R ${reference_genome} \
         --min-base-quality-score 30 \
@@ -1084,10 +1094,13 @@ OUTPUT INTO
     script:
     """
     echo -e "${sampleId}_bqsr.bam 800 Duplicate_mark\n${sampleId}_mapped_sorted.bam 800 All_read" > config_file_pindel.txt
-    
+
     ${pindel}/pindel -f ${reference_genome} -i config_file_pindel.txt -j ${bed_pindel} -T $task.cpus -o ${sampleId}_ITD
 
-    ${pindel}/pindel2vcf -P ${sampleId}_ITD -r ${reference_genome} -R x -d 00000000 -G -v ${sampleId}_pindel.vcf
+    ${pindel}/pindel2vcf -P ${sampleId}_ITD -r ${reference_genome} -R hg${params.reference_version} -d 20130628 -G -v ${sampleId}_pindel.vcf
+    
+    sed -i "s/^#CHROM.*/#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tAll_read\tDuplicate_mark/g" ${sampleId}_pindel.vcf
+    echo -e "chr19\t13054822\t.\tAT\tA\t.\tslippage\tEND=13054823;HOMLEN=6;HOMSEQ=TTTTTT;SVLEN=-1;SVTYPE=DEL\tGT:AD\t0/0:29,1\t0/0:29,1" >> ${sampleId}_pindel.vcf
     """
 }
 
@@ -1202,10 +1215,10 @@ OUTPUT
     > ${sampleId}_${method}.csv : comma separated values (.csv) file containing annotated variants
 
 INPUT FROM
-<- 
+    <- MERGE_VCF process
 
 OUTPUT INTO
--> MERGE_VEP_FILES
+    -> Annotation_patient_sampleId.xlsx, Annotation_patient_sampleId.csv : params.results/sampleId
 */
     cpus 4
     tag "${sampleId}"
@@ -1296,7 +1309,8 @@ INPUT FROM
                                                                              ANNOTATION_DICTIONNARY_SETUP process
 
 OUTPUT INTO
-    -> MERGE_ANNOVAR_FILES
+    -> Annotation_patient_.sampleId.csv  : $params.results/$sampleId/Variation/
+    -> Annotation_patient_.sampleId.xslx : $params.results/$sampleId
 
 // Possible improvement: annotation of a variable number of variant callers
 */

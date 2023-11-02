@@ -8,6 +8,7 @@ results/*
 work/*
 pipeline_*
 *.json
+subworkflows/*
 
 multiqc*
 
